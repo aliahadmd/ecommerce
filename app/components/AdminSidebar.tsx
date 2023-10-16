@@ -17,7 +17,7 @@ interface Props {
 const AdminSidebar = ({ children }: Props) => {
   return (
     <div className="flex">
-      <div className="flex flex-col justify-between bg-cyan-600 h-screen sticky top-0 w-64 p-10">
+      <div className="flex flex-col justify-between bg-gray-900 h-screen sticky top-0 w-64 p-10">
         <ul className="space-y-4 text-white">
           <li>
             <Link
