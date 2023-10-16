@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ReactNode } from "react";
 
 const Footer = () => {
   return (
@@ -8,11 +8,16 @@ const Footer = () => {
           <div className="flex flex-wrap -mx-4">
             <div className="w-full px-4 sm:w-2/3 lg:w-3/12">
               <div className="w-full mb-10">
-                <a href="/#" className="mb-6 inline-block max-w-[160px] font-semibold text-2xl">
+                <a
+                  href="/#"
+                  className="mb-6 inline-block max-w-[160px] font-semibold text-2xl"
+                >
                   Ecommerce.
                 </a>
                 <p className="text-base mb-7 text-body-color">
-                  This application is made by Ali. It is just a demo app to showwcase. This ecommerce website is not real. So don't buy anything!
+                  This application is made by Ali. It is just a demo app to
+                  showwcase. This ecommerce website is not real. So don&apos;t
+                  buy anything!
                 </p>
                 <p className="flex items-center text-sm font-medium text-dark">
                   <span className="mr-3 text-primary">
@@ -33,8 +38,14 @@ const Footer = () => {
             </div>
 
             <LinkGroup header="More product">
-              <NavLink link="http://localhost:3000/iCarCover%20Custom%20Car%20Cover/652c2d5f07911c9249efaef8" label="Icar Cover" />
-              <NavLink link="http://localhost:3000/Apple%20AirPods%20(2nd%20Generation)%20/652bdbcfec58f769a1f1e18a" label="Airpods Pro" />
+              <NavLink
+                link="http://localhost:3000/iCarCover%20Custom%20Car%20Cover/652c2d5f07911c9249efaef8"
+                label="Icar Cover"
+              />
+              <NavLink
+                link="http://localhost:3000/Apple%20AirPods%20(2nd%20Generation)%20/652bdbcfec58f769a1f1e18a"
+                label="Airpods Pro"
+              />
               <NavLink link="/#" label="Iphone XR" />
               <NavLink link="/#" label="Sample product" />
             </LinkGroup>
@@ -181,7 +192,12 @@ const Footer = () => {
 
 export default Footer;
 
-const LinkGroup = ({ children, header }) => {
+interface LinkGroupProps {
+  children: ReactNode;
+  header: string;
+}
+
+const LinkGroup: React.FC<LinkGroupProps> = ({ children, header }) => {
   return (
     <>
       <div className="w-full px-4 sm:w-1/2 lg:w-2/12">
@@ -194,7 +210,12 @@ const LinkGroup = ({ children, header }) => {
   );
 };
 
-const NavLink = ({ link, label }) => {
+interface NavLinkProps {
+  link: string;
+  label: string;
+}
+
+const NavLink: React.FC<NavLinkProps> = ({ link, label }) => {
   return (
     <div>
       <li>
