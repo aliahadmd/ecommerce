@@ -1,6 +1,6 @@
 # Plan 9 — Testing & Quality Uplift
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plans 2–8
 **Estimated effort:** 2 days
 
@@ -63,3 +63,9 @@ Mailpit link extraction + seeding happen in `e2e/helpers.ts`; tests must pass on
 - [ ] Seed covers types/attributes/variants/reviews/wishlist and stays idempotent (runs twice cleanly).
 - [ ] README documents the e2e workflow.
 - [ ] Gates green: `pnpm typecheck && pnpm test && pnpm lint && pnpm e2e`.
+
+---
+
+## As-built note (2026-09-26)
+
+6 Playwright specs all green (register/verify via Mailpit API, browse+filter, variant add-to-cart, wishlist, review-after-purchase with seller delivery, full COD order fulfillment). Vitest still 20 unit tests — integration suites deferred (e2e covers the paths end-to-end).

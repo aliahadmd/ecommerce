@@ -1,6 +1,6 @@
 # Plan 4 — Product Types & Attributes
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (independent; plan-5 builds on it)
 **Estimated effort:** 1.5–2 days
 
@@ -90,3 +90,9 @@ Public: `getAttributeFacets({ categorySlug })` — for plan-8 (attribute + disti
 ## Explicitly not in this plan
 
 Variant generation/selection (plan-5), storefront facets (plan-8), attribute-based comparison tables.
+
+---
+
+## As-built note (2026-09-26)
+
+As planned; `use_for_variants` restricted to select kind server-side; parent validation ancestor-walk; global-attribute partial unique index.

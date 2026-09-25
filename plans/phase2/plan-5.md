@@ -1,6 +1,6 @@
 # Plan 5 — Variants
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-4 (types & attributes)
 **Estimated effort:** 2.5–3 days — the largest plan in phase 2
 
@@ -84,3 +84,9 @@ CREATE UNIQUE INDEX cart_items_cart_variant_unique ON cart_items (cart_id, produ
 ## Explicitly not in this plan
 
 Per-variant SEO, variant-level bulk CSV edit, infinite axes (phase 2 caps axes at 3 for UI sanity — server enforces ≤ 3 variant-axis attributes per type).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. SKU generation via random suffix (probe showed collision-free). order_items.variant_id ON DELETE SET NULL (not restrict) so order history survives variant deletion; referenced variants are archived instead of deleted.

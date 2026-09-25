@@ -1,6 +1,6 @@
 # Plan 7 — Catalog Management Enhancements
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-2 (details/threshold), plan-5 (variants)
 **Estimated effort:** 1.5 days
 
@@ -47,3 +47,9 @@ Make sellers and admins faster at scale: bulk operations, product duplication, C
 ## Explicitly not in this plan
 
 CSV import, drag-and-drop category trees, scheduled exports, product feeds (plan-10).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned; duplicate copies images by reference (rows point at same S3 keys — no object copy needed); CSV streamed with RFC-4180 quoting + BOM.

@@ -1,6 +1,6 @@
 # Plan 8 — Storefront Enhancements
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-3 (wishlist), plan-5 (variants), plan-6 (reviews)
 **Estimated effort:** 1.5 days
 
@@ -55,3 +55,9 @@ Turn the phase-1 storefront into a discovery surface: recently viewed products, 
 ## Explicitly not in this plan
 
 Cross-account recently-viewed sync, full-blown faceted search engine (pgvector/trigram hybrid ranking is plan-10), infinite scroll.
+
+---
+
+## As-built note (2026-09-26)
+
+As planned; facet SQL uses per-kind containment (IN / jsonb @>); rating sort indexes shipped in migration 0011.

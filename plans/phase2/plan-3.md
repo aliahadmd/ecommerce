@@ -1,6 +1,6 @@
 # Plan 3 — Wishlist (Saved Products)
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (independent)
 **Estimated effort:** 0.5–1 day
 
@@ -53,3 +53,9 @@ The wishlist is per-user only (no guest wishlists, no shareable lists — plan-1
 ## Explicitly not in this plan
 
 Shareable/public wishlists, wishlists for guests, price-drop alerts (plan-10).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned; batched wishlistStatus per grid.

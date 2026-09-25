@@ -1,6 +1,6 @@
 # Plan 2 — Richer Product Details & Image Management
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (independent)
 **Estimated effort:** 1–1.5 days
 
@@ -54,3 +54,9 @@ ALTER TABLE products
 ## Explicitly not in this plan
 
 Videos, 360° media, per-variant images (plan-5), attribute-based specs (plan-4).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. jsonb dimensions needed `.type<{...}>()` or server-fn RPC typing broke.

@@ -1,6 +1,6 @@
 # Plan 1 — Phase 2 Overview & Architecture
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** Phase 1 complete (all plans Done, audit fixes applied)
 **Date:** 2026-09-25
 

@@ -1,6 +1,6 @@
 # Plan 6 — Reviews & Ratings
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-2 (product page layout)
 **Estimated effort:** 2 days
 
@@ -89,3 +89,9 @@ No anonymous reviews, no edits by sellers to review content, no photos in review
 ## Explicitly not in this plan
 
 Review photos/videos, abuse reporting flow, review invitations by email, Q&A section (plan-10).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. rating stored as rating_avg_x100 int (0..500) to avoid numeric serialization issues; verified-purchase check = paid OR delivered order.
