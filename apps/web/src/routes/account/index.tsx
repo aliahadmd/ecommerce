@@ -11,7 +11,7 @@ import {
 import { roleLabels } from "@/lib/role"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-export const Route = createFileRoute("/account")({
+export const Route = createFileRoute("/account/")({
   beforeLoad: ({ context }) => {
     if (!context.session) {
       throw redirect({ to: "/login", search: { redirect: "/account" } })

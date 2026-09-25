@@ -1,6 +1,161 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { formatMoney } from "@ecommerce/config"
+import { toast } from "sonner"
+import { getCart, removeCartItem, updateCartItem } from "@/server/commerce"
+import { unwrap } from "@/lib/unwrap"
+import { setCartCount } from "@/lib/cart-store"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 
-// Placeholder — replaced by the cart page in plan-8.
 export const Route = createFileRoute("/cart")({
-  component: () => <main className="p-8">Cart — coming right up (plan-8)</main>,
+  beforeLoad: ({ context }) => {
+    if (!context.session) {
+      throw redirect({ to: "/login", search: { redirect: "/cart" } })
+    }
+  },
+  loader: async ({ context: { queryClient } }) => {
+    await queryClient.ensureQueryData({ queryKey: ["cart"], queryFn: () => getCart().then(unwrap) })
+  },
+  component: CartPage,
 })
+
+function CartPage() {
+  const queryClient = useQueryClient()
+  const { data: cart } = useQuery({
+    queryKey: ["cart"],
+    queryFn: () => getCart().then(unwrap),
+  })
+
+  function afterMutation(count: number) {
+    setCartCount(count)
+    void queryClient.invalidateQueries({ queryKey: ["cart"] })
+  }
+
+  const remove = useMutation({
+    mutationFn: (itemId: string) => removeCartItem({ data: { itemId } }),
+    onSuccess: (r) => r.ok && afterMutation(0),
+    onError: (e) => toast.error((e as Error).message),
+  })
+  const update = useMutation({
+    mutationFn: (input: { itemId: string; quantity: number }) =>
+      updateCartItem({ data: input }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      if ("count" in r.data && typeof r.data.count === "number") afterMutation(r.data.count)
+    },
+    onError: (e) => toast.error((e as Error).message),
+  })
+
+  if (!cart) return null
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <h1 className="mb-6 text-xl font-semibold">Your cart</h1>
+      {cart.items.length === 0 ? (
+        <Card>
+          <CardContent className="text-muted-foreground py-12 text-center text-sm">
+            Your cart is empty.{" "}
+            <Link to="/products" search={{}} className="underline">
+              Browse products
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {cart.items.map((item) => (
+            <Card key={item.itemId} className="flex-row items-center gap-4 p-4">
+              <Link to="/products/$slug" params={{ slug: item.slug }} className="shrink-0">
+                <div className="bg-muted size-16 overflow-hidden rounded-lg">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">🛍️</div>
+                  )}
+                </div>
+              </Link>
+              <div className="min-w-0 flex-1">
+                <Link
+                  to="/products/$slug"
+                  params={{ slug: item.slug }}
+                  className="line-clamp-1 text-sm font-medium hover:underline"
+                >
+                  {item.title}
+                </Link>
+                <p className="text-muted-foreground text-xs">
+                  {formatMoney(item.priceCents, item.currency)} · {item.shopName}
+                  {item.quantity > item.stock && (
+                    <span className="text-destructive ml-2">only {item.stock} left</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="icon-xs"
+                  onClick={() =>
+                    update.mutate({ itemId: item.itemId, quantity: item.quantity - 1 })
+                  }
+                >
+                  −
+                </Button>
+                <Input
+                  className="w-12 text-center"
+                  defaultValue={item.quantity}
+                  key={item.itemId + item.quantity}
+                  onBlur={(e) => {
+                    const q = Number(e.target.value)
+                    if (Number.isInteger(q) && q > 0 && q !== item.quantity) {
+                      update.mutate({ itemId: item.itemId, quantity: q })
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon-xs"
+                  onClick={() =>
+                    update.mutate({ itemId: item.itemId, quantity: item.quantity + 1 })
+                  }
+                >
+                  +
+                </Button>
+              </div>
+              <div className="w-20 text-right text-sm font-semibold">
+                {formatMoney(item.priceCents * item.quantity, item.currency)}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Remove"
+                onClick={() => remove.mutate(item.itemId)}
+              >
+                ×
+              </Button>
+            </Card>
+          ))}
+
+          <Separator />
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="font-semibold">
+              {formatMoney(cart.subtotalCents, cart.items[0]?.currency ?? "USD")}
+            </span>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Payment: cash on delivery — you pay when the order arrives.
+          </p>
+          <div className="flex justify-end">
+            <Button render={<Link to="/checkout" search={{}} />} size="lg">
+              Checkout
+            </Button>
+          </div>
+        </div>
+      )}
+    </main>
+  )
+}

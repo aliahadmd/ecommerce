@@ -1,11 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
+import { toast } from "sonner"
+import { addToCart } from "@/server/commerce"
 import { getProduct } from "@/server/catalog"
+import { unwrap } from "@/lib/unwrap"
+import { setCartCount } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { unwrap } from "@/lib/unwrap"
 import { Separator } from "@/components/ui/separator"
 
 export const Route = createFileRoute("/products/$slug")({
@@ -20,9 +23,24 @@ export const Route = createFileRoute("/products/$slug")({
 
 function ProductDetailPage() {
   const { slug } = Route.useParams()
+  const queryClient = useQueryClient()
   const { data, isError } = useQuery({
     queryKey: ["product", slug],
     queryFn: () => getProduct({ data: { slug } }).then(unwrap),
+  })
+
+  const add = useMutation({
+    mutationFn: (quantity: number) => addToCart({ data: { productId: product.id, quantity } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      setCartCount(r.data.count)
+      void queryClient.invalidateQueries({ queryKey: ["cart"] })
+      toast.success("Added to cart")
+    },
+    onError: (e) => toast.error((e as Error).message),
   })
 
   if (isError) {
@@ -117,6 +135,15 @@ function ProductDetailPage() {
               ))}
             </div>
           )}
+
+          <div className="mt-6 flex items-center gap-2">
+            <Button
+              disabled={product.stock === 0 || add.isPending}
+              onClick={() => add.mutate(1)}
+            >
+              Add to cart
+            </Button>
+          </div>
 
           <Separator className="my-6" />
           <p className="text-sm leading-relaxed whitespace-pre-line">{product.description}</p>

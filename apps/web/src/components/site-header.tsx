@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -88,12 +89,14 @@ export function Header({ user }: { user: AppUser | null }) {
                 }
               />
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div className="truncate">{user.email}</div>
-                  <div className="text-muted-foreground text-xs font-normal">
-                    {roleLabels[user.role]}
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    <div className="truncate">{user.email}</div>
+                    <div className="text-muted-foreground text-xs font-normal">
+                      {roleLabels[user.role]}
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem render={<Link to="/account" />}>
                   <User className="size-4" /> My account
