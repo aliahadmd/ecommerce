@@ -14,11 +14,18 @@ import { Separator } from "@/components/ui/separator"
 
 export const Route = createFileRoute("/products/$slug")({
   loader: async ({ context: { queryClient }, params }) => {
-    await queryClient.ensureQueryData({
+    const data = await queryClient.ensureQueryData({
       queryKey: ["product", params.slug],
       queryFn: () => getProduct({ data: { slug: params.slug } }).then(unwrap),
     })
+    return { title: data.product.title, description: data.product.description.slice(0, 160) }
   },
+  head: ({ match }) => ({
+    meta: [
+      { title: `${match.loaderData?.title ?? "Product"} — Ecommerce` },
+      { name: "description", content: match.loaderData?.description ?? "" },
+    ],
+  }),
   component: ProductDetailPage,
 })
 
