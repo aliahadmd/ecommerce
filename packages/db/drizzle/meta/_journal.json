@@ -50,6 +50,13 @@
       "when": 1790352591725,
       "tag": "0006_wild_layla_miller",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790353153319,
+      "tag": "0007_boring_may_parker",
+      "breakpoints": true
     }
   ]
 }

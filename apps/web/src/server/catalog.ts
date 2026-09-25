@@ -16,6 +16,7 @@ import {
 import { cachedJson, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
+import { validateAttributeValue } from "./attributes"
 
 /** Escape LIKE/ILIKE wildcards so user input can't inject patterns. */
 function escapeLike(input: string): string {
@@ -411,7 +412,24 @@ export const getProduct = createServerFn({ method: "GET" })
         .innerJoin(schema.tags, eq(schema.productTags.tagId, schema.tags.id))
         .where(eq(schema.productTags.productId, row.product.id))
 
-      return { ...row, images, tags }
+      // Spec sheet (plan-4): non-variant-axis attributes with values
+      const attributes = await db
+        .select({
+          name: schema.attributeDefinitions.name,
+          slug: schema.attributeDefinitions.slug,
+          unit: schema.attributeDefinitions.unit,
+          useForVariants: schema.attributeDefinitions.useForVariants,
+          value: schema.productAttributeValues.value,
+        })
+        .from(schema.productAttributeValues)
+        .innerJoin(
+          schema.attributeDefinitions,
+          eq(schema.productAttributeValues.attributeId, schema.attributeDefinitions.id),
+        )
+        .where(eq(schema.productAttributeValues.productId, row.product.id))
+        .orderBy(asc(schema.attributeDefinitions.position))
+
+      return { ...row, images, tags, attributes }
     })
   )
 
@@ -571,9 +589,67 @@ const productFields = (input: unknown) => {
     throw new AppError("INVALID", "Low-stock threshold must be a non-negative whole number")
   }
 
+  const productTypeId = raw.productTypeId ? String(raw.productTypeId) : null
+  const attributes = Array.isArray(raw.attributes)
+    ? (raw.attributes as { attributeId: unknown; value: unknown }[])
+        .map((a) => ({ attributeId: String(a.attributeId), value: a.value }))
+        .slice(0, 30)
+    : []
   return {
-    title, description, priceCents, stock, status, categoryId, tagIds,
+    title, description, priceCents, stock, status, categoryId, tagIds, productTypeId,
     brand, summary, condition, weightGrams, dimensions, seoTitle, seoDescription, lowStockThreshold,
+    attributes,
+  }
+}
+
+/** Validate + persist product attribute values against their definitions. */
+async function persistProductAttributes(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  productId: string,
+  productTypeId: string | null,
+  rawValues: { attributeId: string; value: unknown }[],
+  published: boolean,
+): Promise<void> {
+  if (rawValues.length > 0) {
+    const ids = [...new Set(rawValues.map((v) => v.attributeId))]
+    const defs = await tx
+      .select()
+      .from(schema.attributeDefinitions)
+      .where(inArray(schema.attributeDefinitions.id, ids))
+    const defById = new Map(defs.map((d) => [d.id, d]))
+    const values = rawValues.flatMap((v) => {
+      const def = defById.get(v.attributeId)
+      if (!def) return []
+      // attributes from a different type/global are allowed if still visible
+      return [{ attributeId: def.id, value: validateAttributeValue(def, v.value) }]
+    })
+    await tx
+      .delete(schema.productAttributeValues)
+      .where(eq(schema.productAttributeValues.productId, productId))
+    await tx
+      .insert(schema.productAttributeValues)
+      .values(values.map((v) => ({ productId, attributeId: v.attributeId, value: v.value })))
+  }
+  if (published) {
+    const provided = new Set(rawValues.map((v) => v.attributeId))
+    const requiredDefs = await tx
+      .select({ id: schema.attributeDefinitions.id, name: schema.attributeDefinitions.name })
+      .from(schema.attributeDefinitions)
+      .where(
+        and(
+          eq(schema.attributeDefinitions.required, true),
+          productTypeId
+            ? sql`${schema.attributeDefinitions.productTypeId} IS NULL OR ${schema.attributeDefinitions.productTypeId} = ${productTypeId}`
+            : sql`${schema.attributeDefinitions.productTypeId} IS NULL`,
+        ),
+      )
+    const missing = requiredDefs.filter((d) => !provided.has(d.id))
+    if (missing.length > 0) {
+      throw new AppError(
+        "INVALID",
+        `Missing required specifications: ${missing.map((d) => d.name).join(", ")}`,
+      )
+    }
   }
 }
 
@@ -598,6 +674,7 @@ export const createProduct = createServerFn({ method: "POST" })
             .values({
               shopId: shop.id,
               categoryId: data.categoryId,
+              productTypeId: data.productTypeId,
               title: data.title,
               slug,
               description: data.description,
@@ -622,6 +699,13 @@ export const createProduct = createServerFn({ method: "POST" })
               )
               .onConflictDoNothing()
           }
+          await persistProductAttributes(
+            tx,
+            product.id,
+            data.productTypeId,
+            data.attributes,
+            product.status === "active",
+          )
           return { id: product.id, slug: product.slug }
         })
       } catch (err) {
@@ -667,11 +751,19 @@ export const getProductForEdit = createServerFn({ method: "GET" })
         .select({ id: schema.productTags.tagId })
         .from(schema.productTags)
         .where(eq(schema.productTags.productId, data.id))
+      const attributeValues = await db
+        .select({
+          attributeId: schema.productAttributeValues.attributeId,
+          value: schema.productAttributeValues.value,
+        })
+        .from(schema.productAttributeValues)
+        .where(eq(schema.productAttributeValues.productId, data.id))
       return {
         product: row.product,
         ownerId: row.ownerId,
         images,
         tagIds: tags.map((t) => t.id),
+        attributes: attributeValues,
       }
     })
   )
@@ -701,6 +793,7 @@ export const updateProduct = createServerFn({ method: "POST" })
           .update(schema.products)
           .set({
             categoryId: data.categoryId,
+            productTypeId: data.productTypeId,
             title: data.title,
             description: data.description,
             summary: data.summary,
@@ -726,6 +819,13 @@ export const updateProduct = createServerFn({ method: "POST" })
             .values(data.tagIds.map((tagId) => ({ productId: data.id, tagId })))
             .onConflictDoNothing()
         }
+        await persistProductAttributes(
+          tx,
+          data.id,
+          data.productTypeId,
+          data.attributes,
+          product.status === "active",
+        )
         return { id: product.id, slug: product.slug }
       })
     })

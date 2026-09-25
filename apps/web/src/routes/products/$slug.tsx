@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
@@ -101,7 +101,7 @@ function ProductDetailPage() {
     )
   }
 
-  const { product, shop, images, tags, categoryName, categorySlug } = data
+  const { product, shop, images, tags, attributes, categoryName, categorySlug } = data
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -226,6 +226,25 @@ function ProductDetailPage() {
             </Button>
           </div>
 
+          {attributes.length > 0 && (
+            <>
+              <Separator className="my-6" />
+              <h2 className="mb-2 text-sm font-semibold">Specifications</h2>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                {attributes
+                  .filter((a) => !a.useForVariants)
+                  .map((a) => (
+                    <Fragment key={a.slug}>
+                      <dt className="text-muted-foreground">{a.name}</dt>
+                      <dd>
+                        {Array.isArray(a.value) ? a.value.join(", ") : String(a.value)}
+                        {a.unit ? ` ${a.unit}` : ""}
+                      </dd>
+                    </Fragment>
+                  ))}
+              </dl>
+            </>
+          )}
           <Separator className="my-6" />
           <p className="text-sm leading-relaxed whitespace-pre-line">
             {product.description}

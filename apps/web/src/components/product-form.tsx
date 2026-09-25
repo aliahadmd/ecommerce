@@ -5,8 +5,10 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { getCategories, getTags } from "@/server/catalog"
 import { aiStatus, generateDescription, suggestTags } from "@/server/ai"
+import { getTypeAttributeDefinitions, listProductTypeOptions } from "@/server/attributes"
 import { unwrap } from "@/lib/unwrap"
 import { Sparkles } from "lucide-react"
+import { cn } from "cn"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -46,7 +48,11 @@ const productFormSchema = z.object({
   seoTitle: z.string().max(200),
   seoDescription: z.string().max(300),
   lowStockThreshold: stockSchema,
+  productTypeId: z.string().nullable(),
+  attributes: z.array(z.object({ attributeId: z.string(), value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]) })),
 })
+
+export type SpecValue = string | number | boolean | string[]
 
 export interface ProductFormValues {
   title: string
@@ -64,6 +70,8 @@ export interface ProductFormValues {
   seoTitle: string
   seoDescription: string
   lowStockThreshold: string
+  productTypeId: string | null
+  attributes: { attributeId: string; value: SpecValue }[]
 }
 
 function errMsg(e: unknown): string {
@@ -129,6 +137,21 @@ export function ProductForm({
     onError: (e) => toast.error(e.message),
   })
 
+  const [specValues, setSpecValues] = useState<Record<string, SpecValue>>(
+    Object.fromEntries((defaultValues.attributes ?? []).map((a) => [a.attributeId, a.value])),
+  )
+  const { data: typeOptions } = useQuery({
+    queryKey: ["product-type-options"],
+    queryFn: () => listProductTypeOptions().then(unwrap),
+    staleTime: 60_000,
+  })
+  const selectedTypeId = defaultValues.productTypeId
+  const { data: specDefs } = useQuery({
+    queryKey: ["type-attributes", selectedTypeId],
+    queryFn: () => getTypeAttributeDefinitions({ data: { productTypeId: selectedTypeId } }).then(unwrap),
+    staleTime: 60_000,
+  })
+
   const form = useForm({
     defaultValues,
     validators: { onSubmit: productFormSchema },
@@ -149,6 +172,13 @@ export function ProductForm({
         seoTitle: value.seoTitle.trim() || "",
         seoDescription: value.seoDescription.trim() || "",
         lowStockThreshold: value.lowStockThreshold.trim() || "5",
+        productTypeId: value.productTypeId,
+        attributes: Object.entries(specValues)
+          .filter(([, v]) => v !== "" && v !== " ")
+          .map(([attributeId, v]) => ({
+            attributeId,
+            value: v,
+          })),
       }),
   })
 
@@ -379,6 +409,114 @@ export function ProductForm({
           </div>
         )}
       </form.Field>
+
+      <div className="border-t pt-4">
+        <h3 className="mb-3 text-sm font-medium">Type & specifications</h3>
+        <div className="space-y-4">
+          <form.Field name="productTypeId">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label>Product type</Label>
+                <Select
+                  value={field.state.value ?? "none"}
+                  onValueChange={(v) => field.handleChange(v === "none" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No type</SelectItem>
+                    {(typeOptions ?? []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </form.Field>
+          {(specDefs ?? []).map((def) => (
+            <div key={def.id} className="space-y-1.5">
+              <Label>
+                {def.name}
+                {def.unit ? <span className="text-muted-foreground"> ({def.unit})</span> : null}
+                {def.required && <span className="text-destructive"> *</span>}
+              </Label>
+              {def.kind === "boolean" ? (
+                <Checkbox
+                  checked={specValues[def.id] === true}
+                  onCheckedChange={(v) =>
+                    setSpecValues((prev) => ({ ...prev, [def.id]: v === true }))
+                  }
+                />
+              ) : def.kind === "select" ? (
+                <Select
+                  value={String(specValues[def.id] ?? "")}
+                  onValueChange={(v) => setSpecValues((prev) => ({ ...prev, [def.id]: v ?? " " }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value=" ">—</SelectItem>
+                    {def.options.map((o) => (
+                      <SelectItem key={o} value={o}>
+                        {o}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : def.kind === "multiselect" ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {def.options.map((o) => {
+                    const current = Array.isArray(specValues[def.id])
+                      ? (specValues[def.id] as string[])
+                      : []
+                    const checked = current.includes(o)
+                    return (
+                      <button
+                        key={o}
+                        type="button"
+                        className={cn(
+                          "rounded-full border px-2.5 py-0.5 text-xs",
+                          checked && "bg-primary text-primary-foreground",
+                        )}
+                        onClick={() =>
+                          setSpecValues((prev) => ({
+                            ...prev,
+                            [def.id]: checked
+                              ? current.filter((c) => c !== o)
+                              : [...current, o],
+                          }))
+                        }
+                      >
+                        {o}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <Input
+                  type={def.kind === "number" ? "number" : "text"}
+                  value={String(specValues[def.id] ?? "")}
+                  onChange={(e) =>
+                    setSpecValues((prev) => ({
+                      ...prev,
+                      [def.id]:
+                        def.kind === "number"
+                          ? e.target.value === ""
+                            ? ""
+                            : Number(e.target.value)
+                          : e.target.value,
+                    }))
+                  }
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="border-t pt-4">
         <h3 className="mb-3 text-sm font-medium">Details</h3>

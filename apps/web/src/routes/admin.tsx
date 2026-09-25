@@ -26,6 +26,13 @@ function AdminLayout() {
           <Shield className="mr-1.5 inline size-4" /> Dashboard
         </Link>
         <Link
+          to="/admin/types"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Types
+        </Link>
+        <Link
           to="/admin/catalog"
           className="rounded-md px-3 py-1.5 hover:bg-muted"
           activeProps={{ className: "bg-muted font-medium" }}

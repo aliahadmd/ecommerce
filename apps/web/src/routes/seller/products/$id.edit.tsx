@@ -56,7 +56,7 @@ function EditProductPage() {
     return <Skeleton className="mx-auto h-96 max-w-2xl" />
   }
 
-  const { product, images, tagIds } = data
+  const { product, images, tagIds, attributes } = data
 
   return (
     <Card className="mx-auto max-w-2xl">
@@ -89,6 +89,8 @@ function EditProductPage() {
             seoTitle: product.seoTitle ?? "",
             seoDescription: product.seoDescription ?? "",
             lowStockThreshold: String(product.lowStockThreshold),
+            productTypeId: product.productTypeId,
+            attributes: attributes.map((a) => ({ attributeId: a.attributeId, value: a.value })),
           }}
           submitLabel="Save changes"
           onSubmit={onSubmit}

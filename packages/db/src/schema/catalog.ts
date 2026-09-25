@@ -13,6 +13,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { productTypes } from "./attributes"
 import { shops } from "./shops";
 
 export const productStatus = pgEnum("product_status", ["draft", "active", "archived"]);
@@ -77,6 +78,9 @@ export const products = pgTable(
     currency: char("currency", { length: 3 }).notNull().default("USD"),
     stock: integer("stock").notNull().default(0),
     status: productStatus("status").notNull().default("draft"),
+    productTypeId: uuid("product_type_id").references(() => productTypes.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

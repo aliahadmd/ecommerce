@@ -58,6 +58,8 @@ function NewProductPage() {
             seoTitle: "",
             seoDescription: "",
             lowStockThreshold: "5",
+            productTypeId: null,
+            attributes: [],
           }}
           submitLabel="Create product"
           onSubmit={onSubmit}

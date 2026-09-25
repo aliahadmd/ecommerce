@@ -1,5 +1,6 @@
 export { db, type Tx } from "./client";
 export * as schema from "./schema/index";
+export type { AttributeValue } from "./schema/attributes";
 
 // Re-export the query-builder surface app code needs, so consumers depend on
 // @ecommerce/db only (single drizzle version, no direct dependency).
