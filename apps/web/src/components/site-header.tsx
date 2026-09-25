@@ -20,7 +20,7 @@ import { setCartCount, useCartCount } from "@/lib/cart-store"
 import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
 import { getSession } from "@/server/session"
 import type { AppUser } from "@/server/session"
-import { ShoppingBag, Search, LogOut, User, Store, Shield } from "lucide-react"
+import { ShoppingBag, Search, LogOut, Moon, Shield, Store, Sun, User } from "lucide-react"
 
 /** Search + cart + role-aware account menu. Re-renders from root context. */
 export function Header({ user }: { user: AppUser | null }) {
@@ -83,6 +83,7 @@ export function Header({ user }: { user: AppUser | null }) {
             render={<Link to="/cart" search={{}} />}
             variant="ghost"
             size="icon"
+            className="relative"
             aria-label="Cart"
           >
             <ShoppingBag className="size-5" />
@@ -167,7 +168,11 @@ function ThemeToggle() {
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
       onClick={toggleTheme}
     >
-      {theme === "dark" ? "☀️" : "🌙"}
+      {theme === "dark" ? (
+        <Sun className="size-4" />
+      ) : (
+        <Moon className="size-4" />
+      )}
     </Button>
   )
 }
