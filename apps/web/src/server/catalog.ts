@@ -13,7 +13,7 @@ import {
   or,
   sql,
 } from "@ecommerce/db"
-import { cachedJson, invalidateCache } from "@ecommerce/redis"
+import { cachedJson, getRedis, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { validateAttributeValue } from "./attributes"
@@ -1056,3 +1056,287 @@ export const listRelatedProducts = createServerFn({ method: "GET" })
       return related
     }),
   )
+
+// ── Plan-7: bulk operations, duplication, CSV export, category reorder ──────
+
+export const bulkSetProductStatus = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = input as { productIds?: unknown; status?: unknown }
+    const productIds = Array.isArray(raw.productIds) ? raw.productIds.map(String) : []
+    const status = String(raw.status ?? "")
+    if (productIds.length === 0 || productIds.length > 100) {
+      throw new AppError("INVALID", "Select 1–100 products")
+    }
+    if (!["draft", "active", "archived"].includes(status)) {
+      throw new AppError("INVALID", "Invalid status")
+    }
+    return {
+      productIds,
+      status: status as "draft" | "active" | "archived",
+    }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      const user = await requireRole("seller", "super_admin")
+      let updated = 0
+      for (const productId of data.productIds) {
+        const [row] = await db
+          .select({ ownerId: schema.shops.ownerId })
+          .from(schema.products)
+          .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+          .where(eq(schema.products.id, productId))
+          .limit(1)
+        if (!row) continue
+        if (user.role !== "super_admin" && user.id !== row.ownerId) continue
+        await db
+          .update(schema.products)
+          .set({ status: data.status })
+          .where(eq(schema.products.id, productId))
+        updated++
+      }
+      return { updated, skipped: data.productIds.length - updated }
+    }),
+  )
+
+export const duplicateProduct = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const productId = String((input as { productId?: unknown })?.productId ?? "")
+    if (!productId) throw new AppError("INVALID", "productId required")
+    return { productId }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      const user = await requireRole("seller", "super_admin")
+      const [row] = await db
+        .select({ product: schema.products, ownerId: schema.shops.ownerId })
+        .from(schema.products)
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .where(eq(schema.products.id, data.productId))
+        .limit(1)
+      if (!row) throw new AppError("NOT_FOUND", "Product not found")
+      if (user.role !== "super_admin" && user.id !== row.ownerId) {
+        throw new AppError("FORBIDDEN", "You can only duplicate your own products")
+      }
+      const src = row.product
+
+      let slug = slugify(`${src.title} copy`)
+      const [taken] = await db
+        .select({ id: schema.products.id })
+        .from(schema.products)
+        .where(eq(schema.products.slug, slug))
+        .limit(1)
+      if (taken) slug = slugWithSuffix(slug)
+
+      const copy = await db.transaction(async (tx) => {
+        const [product] = await tx
+          .insert(schema.products)
+          .values({
+            shopId: src.shopId,
+            categoryId: src.categoryId,
+            productTypeId: src.productTypeId,
+            title: `${src.title} (copy)`,
+            slug,
+            description: src.description,
+            summary: src.summary,
+            brand: src.brand,
+            condition: src.condition,
+            weightGrams: src.weightGrams,
+            dimensions: src.dimensions,
+            seoTitle: src.seoTitle,
+            seoDescription: src.seoDescription,
+            lowStockThreshold: src.lowStockThreshold,
+            priceCents: src.priceCents,
+            stock: src.stock,
+            currency: src.currency,
+            status: "draft",
+          })
+          .returning()
+        const srcTags = await tx
+          .select({ tagId: schema.productTags.tagId })
+          .from(schema.productTags)
+          .where(eq(schema.productTags.productId, src.id))
+        if (srcTags.length > 0) {
+          await tx
+            .insert(schema.productTags)
+            .values(srcTags.map((t) => ({ productId: product.id, tagId: t.tagId })))
+            .onConflictDoNothing()
+        }
+        const srcAttrs = await tx
+          .select()
+          .from(schema.productAttributeValues)
+          .where(eq(schema.productAttributeValues.productId, src.id))
+        if (srcAttrs.length > 0) {
+          await tx.insert(schema.productAttributeValues).values(
+            srcAttrs.map((a) => ({ productId: product.id, attributeId: a.attributeId, value: a.value })),
+          )
+        }
+        // images: rows reference the same S3 objects (no object copy needed)
+        const srcImages = await tx
+          .select()
+          .from(schema.productImages)
+          .where(eq(schema.productImages.productId, src.id))
+          .orderBy(asc(schema.productImages.sortOrder))
+        const imageIdMap = new Map<string, string>()
+        for (const img of srcImages) {
+          const [newImage] = await tx
+            .insert(schema.productImages)
+            .values({
+              productId: product.id,
+              key: img.key,
+              url: img.url,
+              alt: img.alt,
+              sortOrder: img.sortOrder,
+            })
+            .returning({ id: schema.productImages.id })
+          imageIdMap.set(img.id, newImage.id)
+        }
+        // variants + option values
+        const srcVariants = await tx
+          .select()
+          .from(schema.productVariants)
+          .where(eq(schema.productVariants.productId, src.id))
+          .orderBy(asc(schema.productVariants.position))
+        for (const [i, v] of srcVariants.entries()) {
+          const [newVariant] = await tx
+            .insert(schema.productVariants)
+            .values({
+              productId: product.id,
+              sku: `${v.sku}-C${i + 1}`,
+              title: v.title,
+              priceCents: v.priceCents,
+              stock: v.stock,
+              weightGrams: v.weightGrams,
+              imageId: v.imageId ? (imageIdMap.get(v.imageId) ?? null) : null,
+              isDefault: v.isDefault,
+              status: "draft",
+              position: v.position,
+            })
+            .returning({ id: schema.productVariants.id })
+          const srcOpts = await tx
+            .select()
+            .from(schema.variantOptionValues)
+            .where(eq(schema.variantOptionValues.variantId, v.id))
+          if (srcOpts.length > 0) {
+            await tx.insert(schema.variantOptionValues).values(
+              srcOpts.map((o) => ({
+                variantId: newVariant.id,
+                attributeId: o.attributeId,
+                value: o.value,
+              })),
+            )
+          }
+        }
+        return { id: product.id, slug: product.slug }
+      })
+      return copy
+    }),
+  )
+
+export const reorderCategories = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = input as { parentId?: unknown; orderedIds?: unknown }
+    const orderedIds = Array.isArray(raw.orderedIds) ? raw.orderedIds.map(String) : []
+    if (orderedIds.length === 0) throw new AppError("INVALID", "orderedIds required")
+    const parentId = raw.parentId ? String(raw.parentId) : null
+    return { parentId, orderedIds }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      await requireRole("super_admin")
+      await db.transaction(async (tx) => {
+        for (const [i, id] of data.orderedIds.entries()) {
+          await tx
+            .update(schema.categories)
+            .set({ sortOrder: i, parentId: data.parentId })
+            .where(eq(schema.categories.id, id))
+        }
+      })
+      await getRedis().del("catalog:categories:v1").catch(() => undefined)
+      return { ok: true }
+    }),
+  )
+
+export const exportProductsCsv = createServerFn({ method: "GET" }).handler(
+  async () => {
+    // Raw Response (no Result envelope): streams a CSV attachment
+    try {
+      const user = await requireRole("seller", "super_admin")
+      const [shop] = await db
+        .select({ id: schema.shops.id })
+        .from(schema.shops)
+        .where(eq(schema.shops.ownerId, user.id))
+        .limit(1)
+      const where =
+        user.role === "super_admin"
+          ? undefined
+          : shop
+            ? eq(schema.products.shopId, shop.id)
+            : sql`false`
+      const rows = await db
+        .select({
+          kind: sql<string>`'product'`,
+          title: schema.products.title,
+          slug: schema.products.slug,
+          brand: schema.products.brand,
+          condition: schema.products.condition,
+          priceCents: schema.products.priceCents,
+          stock: schema.products.stock,
+          status: schema.products.status,
+          variantTitle: sql<string | null>`null`,
+          variantSku: sql<string | null>`null`,
+        })
+        .from(schema.products)
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .where(where)
+      const variantRows = await db
+        .select({
+          kind: sql<string>`'variant'`,
+          title: schema.products.title,
+          slug: schema.products.slug,
+          brand: schema.products.brand,
+          condition: schema.products.condition,
+          priceCents: schema.productVariants.priceCents,
+          stock: schema.productVariants.stock,
+          status: schema.productVariants.status,
+          variantTitle: schema.productVariants.title,
+          variantSku: schema.productVariants.sku,
+        })
+        .from(schema.productVariants)
+        .innerJoin(schema.products, eq(schema.productVariants.productId, schema.products.id))
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .where(where)
+      const all = [...rows, ...variantRows]
+      const header =
+        "row_kind,title,slug,brand,condition,price_cents,stock,status,variant_title,variant_sku"
+      const esc = (v: unknown) => {
+        const str = v === null || v === undefined ? "" : String(v)
+        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
+      }
+      const body = all
+        .map((r) =>
+          [r.kind, r.title, r.slug, r.brand, r.condition, r.priceCents, r.stock, r.status, r.variantTitle, r.variantSku]
+            .map(esc)
+            .join(","),
+        )
+        .join("\n")
+      const csv = `\uFEFF${header}\n${body}\n`
+      return new Response(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="products-${new Date().toISOString().slice(0, 10)}.csv"`,
+        },
+      })
+    } catch (err) {
+      if (err instanceof AppError) {
+        return Response.json(
+          { ok: false, error: { code: err.code, message: err.message } },
+          { status: err.code === "UNAUTHORIZED" ? 401 : 403 },
+        )
+      }
+      return Response.json(
+        { ok: false, error: { code: "INTERNAL", message: "Export failed" } },
+        { status: 500 },
+      )
+    }
+  },
+)

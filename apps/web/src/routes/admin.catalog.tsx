@@ -9,6 +9,7 @@ import {
   deleteTag,
   getCategories,
   getTags,
+  reorderCategories,
   updateCategory,
 } from "@/server/catalog"
 import { Button } from "@/components/ui/button"
@@ -105,6 +106,15 @@ function CategoriesPanel() {
     },
   })
 
+  const reorder = useMutation({
+    mutationFn: (input: { parentId: string | null; orderedIds: string[] }) =>
+      reorderCategories({ data: input }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      void queryClient.invalidateQueries({ queryKey: ["categories"] })
+    },
+  })
+
   const nameOf = (id: string | null) =>
     categories.find((c) => c.id === id)?.name
 
@@ -132,7 +142,7 @@ function CategoriesPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {categories.map((c) => (
+            {categories.map((c, i) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
                 <TableCell className="text-muted-foreground">
@@ -141,6 +151,43 @@ function CategoriesPanel() {
                 <TableCell>{nameOf(c.parentId) ?? "—"}</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${c.name} up`}
+                    disabled={i === 0}
+                    onClick={() => {
+                      const siblings = categories
+                        .filter((x) => x.parentId === c.parentId)
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                      const ids = siblings.map((x) => x.id)
+                      const idx = ids.indexOf(c.id)
+                      if (idx > 0) {
+                        ;[ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]
+                        reorder.mutate({ parentId: c.parentId, orderedIds: ids })
+                      }
+                    }}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${c.name} down`}
+                    onClick={() => {
+                      const siblings = categories
+                        .filter((x) => x.parentId === c.parentId)
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                      const ids = siblings.map((x) => x.id)
+                      const idx = ids.indexOf(c.id)
+                      if (idx < ids.length - 1) {
+                        ;[ids[idx + 1], ids[idx]] = [ids[idx], ids[idx + 1]]
+                        reorder.mutate({ parentId: c.parentId, orderedIds: ids })
+                      }
+                    }}
+                  >
+                    ↓
+                  </Button>
                   <Button
                     variant="outline"
                     size="xs"

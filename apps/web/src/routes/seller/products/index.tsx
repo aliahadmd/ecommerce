@@ -12,9 +12,17 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { z } from "zod"
+import { useState } from "react"
+import { cn } from "cn"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
-import { listSellerProducts, archiveProduct } from "@/server/catalog"
+import {
+  archiveProduct,
+  bulkSetProductStatus,
+  duplicateProduct,
+  exportProductsCsv,
+  listSellerProducts,
+} from "@/server/catalog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,7 +91,51 @@ function SellerProductsPage() {
   })
 
   const rows = data?.rows ?? []
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const bulk = useMutation({
+    mutationFn: (status: "active" | "archived") =>
+      bulkSetProductStatus({ data: { productIds: [...selected], status } }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else toast.success(`${r.data.updated} updated, ${r.data.skipped} skipped`)
+      setSelected(new Set())
+      void queryClient.invalidateQueries({ queryKey: ["seller-products"] })
+    },
+  })
+
+  const duplicate = useMutation({
+    mutationFn: (productId: string) => duplicateProduct({ data: { productId } }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else {
+        toast.success("Duplicated as draft")
+        void queryClient.invalidateQueries({ queryKey: ["seller-products"] })
+      }
+    },
+  })
   const columns = [
+    col.display({
+      id: "select",
+      header: "",
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${row.original.title}`}
+          checked={selected.has(row.original.id)}
+          onChange={() => toggleSelect(row.original.id)}
+        />
+      ),
+    }),
     col.display({
       id: "image",
       header: "",
@@ -117,7 +169,18 @@ function SellerProductsPage() {
       cell: ({ getValue, row }) =>
         formatMoney(getValue(), row.original.currency),
     }),
-    col.accessor("stock", { header: "Stock" }),
+    col.accessor("stock", {
+      header: "Stock",
+      cell: ({ getValue }) => {
+        const value = getValue()
+        return (
+          <span className={cn(value <= 5 && "font-medium text-amber-600 dark:text-amber-400")}>
+            {value}
+            {value <= 5 ? " ⚠" : ""}
+          </span>
+        )
+      },
+    }),
     col.accessor("status", {
       header: "Status",
       cell: ({ getValue }) => (
@@ -165,6 +228,14 @@ function SellerProductsPage() {
               Activate
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => duplicate.mutate(row.original.id)}
+            disabled={duplicate.isPending}
+          >
+            Duplicate
+          </Button>
         </div>
       ),
     }),
@@ -203,10 +274,50 @@ function SellerProductsPage() {
             }
           }}
         />
+        <Button
+          variant="outline"
+          onClick={async () => {
+            const res = await exportProductsCsv()
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+        >
+          Export CSV
+        </Button>
         <Button render={<Link to="/seller/products/new" search={{}} />}>
           New product
         </Button>
       </div>
+
+      {selected.size > 0 && (
+        <div className="bg-muted mb-3 flex items-center gap-2 rounded-lg p-2 text-sm">
+          <span className="font-medium">{selected.size} selected</span>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => bulk.mutate("active")}
+            disabled={bulk.isPending}
+          >
+            Activate
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => bulk.mutate("archived")}
+            disabled={bulk.isPending}
+          >
+            Archive
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       <div className="rounded-xl border">
         <Table>
