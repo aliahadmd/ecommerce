@@ -1,0 +1,70 @@
+name: ecommerce
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: ecommerce-postgres
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ecommerce
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce -d ecommerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.80
+    container_name: ecommerce-seaweedfs
+    command: >-
+      server -dir=/data -ip=seaweedfs
+      -master.port=9333 -volume.port=8080
+      -filer -filer.port=8888
+      -s3 -s3.port=8333
+      -s3.config=/etc/seaweedfs/s3.json
+      -master.volumeSizeLimitMB=1024
+    ports:
+      - "9333:9333"
+      - "8333:8333"
+      - "8888:8888"
+    volumes:
+      - seaweed_data:/data
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    depends_on: []
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ecommerce-mailpit
+    environment:
+      MP_MAX_MESSAGES: 5000
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    volumes:
+      - mailpit_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+  seaweed_data:
+  mailpit_data:
