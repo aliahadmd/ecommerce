@@ -236,8 +236,11 @@ export type ProductFilters = {
   tag?: string
   min?: number
   max?: number
-  sort?: "newest" | "price-asc" | "price-desc"
+  sort?: "newest" | "price-asc" | "price-desc" | "rating-desc"
   page?: number
+  minRating?: number
+  /** attribute facet filters: attribute slug → value(s) */
+  attributes?: Record<string, string[]>
 }
 
 const productCardColumns = {
@@ -271,6 +274,18 @@ export const listProducts = createServerFn({ method: "GET" })
       max: typeof f.max === "number" ? f.max : undefined,
       sort: f.sort ?? "newest",
       page: Math.max(1, f.page ?? 1),
+      minRating: typeof f.minRating === "number" ? f.minRating : undefined,
+      attributes:
+        f.attributes && typeof f.attributes === "object"
+          ? Object.fromEntries(
+              Object.entries(f.attributes)
+                .slice(0, 5)
+                .map(([k, v]) => [
+                  k.replace(/[^a-z0-9-]/gi, ""),
+                  Array.isArray(v) ? v.map(String).slice(0, 10) : [String(v)],
+                ]),
+            )
+          : undefined,
     } satisfies ProductFilters
   })
   .handler(({ data }) =>
@@ -307,7 +322,9 @@ export const listProducts = createServerFn({ method: "GET" })
           ? asc(schema.products.priceCents)
           : data.sort === "price-desc"
             ? desc(schema.products.priceCents)
-            : desc(schema.products.createdAt)
+            : data.sort === "rating-desc"
+              ? sql`"products"."rating_count" DESC, "products"."rating_avg_x100" DESC, "products"."created_at" DESC`
+              : desc(schema.products.createdAt)
 
       let query = db
         .select(productCardColumns)
@@ -491,6 +508,33 @@ export const getShop = createServerFn({ method: "GET" })
         .limit(24)
       return { shop, items }
     })
+  )
+
+export const listProductsBySlugs = createServerFn({ method: "GET" })
+  .validator((input: unknown) => {
+    const raw = input as { slugs?: unknown }
+    const slugs = Array.isArray(raw.slugs) ? raw.slugs.map(String).slice(0, 12) : []
+    return { slugs }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      if (data.slugs.length === 0) return []
+      const rows = await db
+        .select(productCardColumns)
+        .from(schema.products)
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .where(
+          and(
+            inArray(schema.products.slug, data.slugs),
+            eq(schema.products.status, "active"),
+            eq(schema.shops.status, "active"),
+          ),
+        )
+      const bySlug = new Map(rows.map((r) => [r.slug, r]))
+      return data.slugs
+        .map((slug) => bySlug.get(slug))
+        .filter((p): p is (typeof rows)[number] => p !== undefined)
+    }),
   )
 
 // ─── Seller: product management ─────────────────────────────────────────────

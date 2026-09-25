@@ -100,6 +100,7 @@ export const products = pgTable(
     check("products_low_stock_threshold_check", sql`${t.lowStockThreshold} >= 0`),
     check("products_rating_avg_check", sql`${t.ratingAvgX100} BETWEEN 0 AND 500`),
     check("products_rating_count_check", sql`${t.ratingCount} >= 0`),
+    index("products_rating_idx").on(t.status, t.ratingAvgX100, t.ratingCount),
   ],
 );
 

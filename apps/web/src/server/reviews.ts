@@ -363,12 +363,11 @@ export const setReviewStatus = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const raw = input as { reviewId?: unknown; status?: unknown }
     const reviewId = String(raw.reviewId ?? "")
-    const status = String(raw.status ?? "")
+    const allowed = ["approved", "hidden"] as const
+    const found = allowed.find((s) => s === String(raw.status ?? ""))
     if (!reviewId) throw new AppError("INVALID", "reviewId required")
-    if (status !== "approved" && status !== "hidden") {
-      throw new AppError("INVALID", "Invalid status")
-    }
-    return { reviewId, status: status }
+    if (!found) throw new AppError("INVALID", "Invalid status")
+    return { reviewId, status: found }
   })
   .handler(({ data }) =>
     guard(async () => {

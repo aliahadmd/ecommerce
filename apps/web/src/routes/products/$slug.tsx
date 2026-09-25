@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { Fragment, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import { useVariantSelection, VariantSelectors } from "@/components/variant-sele
 import { ProductReviews } from "@/components/product-reviews"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
+import { trackRecentlyViewed } from "@/lib/recently-viewed"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -49,6 +50,9 @@ function ProductDetailPage() {
 
   const navigate = useNavigate()
   const [quantity, setQuantity] = useState(1)
+  useEffect(() => {
+    trackRecentlyViewed(slug)
+  }, [slug])
   const add = useMutation({
     mutationFn: (input: { quantity: number; variantId?: string }) =>
       addToCart({

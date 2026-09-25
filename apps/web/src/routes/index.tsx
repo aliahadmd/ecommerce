@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
-import { getCategories, listProducts } from "@/server/catalog"
+import { getCategories, listProducts, listProductsBySlugs } from "@/server/catalog"
 import { ProductCard } from "@/components/product-card"
 import { useWishlistSet } from "@/components/wishlist-heart"
+import { useRecentlyViewed } from "@/lib/recently-viewed"
 import { Skeleton } from "@/components/ui/skeleton"
 import { unwrap } from "@/lib/unwrap"
 
@@ -32,6 +33,12 @@ function HomePage() {
 
   const wishlist = useWishlistSet((products?.items ?? []).map((p) => p.id))
   const wishlistCtx = { savedSet: wishlist.savedSet, queryKey: ["products", {}] }
+  const recentSlugs = useRecentlyViewed()
+  const { data: recentProducts } = useQuery({
+    queryKey: ["recently-viewed", recentSlugs],
+    queryFn: () => listProductsBySlugs({ data: { slugs: recentSlugs } }).then(unwrap),
+    enabled: recentSlugs.length > 0,
+  })
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -57,6 +64,17 @@ function HomePage() {
           </Link>
         ))}
       </div>
+
+      {recentProducts && recentProducts.length > 0 && (
+        <>
+          <h2 className="mb-4 text-lg font-semibold">Recently viewed</h2>
+          <div className="mb-10 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {recentProducts.slice(0, 4).map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </>
+      )}
 
       <h2 className="mb-4 text-lg font-semibold">New arrivals</h2>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

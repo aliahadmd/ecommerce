@@ -1,0 +1,1 @@
+CREATE INDEX "products_rating_idx" ON "products" USING btree ("status","rating_avg_x100","rating_count");
