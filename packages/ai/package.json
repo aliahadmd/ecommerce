@@ -9,7 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ecommerce/config": "workspace:*"
+    "@ecommerce/config": "workspace:*",
+    "@openrouter/ai-sdk-provider": "^1.2.7",
+    "ai": "^5.0.60",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

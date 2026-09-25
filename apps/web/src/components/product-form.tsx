@@ -1,8 +1,12 @@
+import { useState } from "react"
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { getCategories, getTags } from "@/server/catalog"
+import { aiStatus, generateDescription, suggestTags } from "@/server/ai"
 import { unwrap } from "@/lib/unwrap"
+import { Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -65,6 +69,39 @@ export function ProductForm({
   const { data: tags } = useQuery({
     queryKey: ["tags"],
     queryFn: () => getTags().then(unwrap),
+  })
+  const { data: ai } = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiStatus().then(unwrap),
+    staleTime: 60_000,
+  })
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  const genDesc = useMutation({
+    mutationFn: (values: { title: string; categoryName: string | null; tagNames: string[] }) =>
+      generateDescription({ data: values }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      form.setFieldValue("description", r.data.description)
+      toast.success("Description generated — review and edit")
+    },
+    onError: (e) => toast.error((e as Error).message),
+  })
+  const genTags = useMutation({
+    mutationFn: (values: { title: string; description: string }) =>
+      suggestTags({ data: values }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      setSuggestions(r.data.suggestions)
+      if (r.data.suggestions.length === 0) toast.info("No tag suggestions")
+    },
+    onError: (e) => toast.error((e as Error).message),
   })
 
   const form = useForm({
@@ -154,7 +191,31 @@ export function ProductForm({
       >
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description">Description</Label>
+              {ai?.enabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={genDesc.isPending}
+                  onClick={() =>
+                    genDesc.mutate({
+                      title: form.getFieldValue("title"),
+                      categoryName:
+                        (categories ?? []).find((c) => c.id === form.getFieldValue("categoryId"))?.name ??
+                        null,
+                      tagNames: (tags ?? [])
+                        .filter((t) => form.getFieldValue("tagIds").includes(t.id))
+                        .map((t) => t.name),
+                    })
+                  }
+                >
+                  <Sparkles className="size-3" />
+                  {genDesc.isPending ? "Generating…" : "Generate description"}
+                </Button>
+              )}
+            </div>
             <Textarea
               id="description"
               rows={6}
@@ -196,7 +257,46 @@ export function ProductForm({
       <form.Field name="tagIds">
         {(field) => (
           <div className="space-y-1.5">
-            <Label>Tags (max 10)</Label>
+            <div className="flex items-center justify-between">
+              <Label>Tags (max 10)</Label>
+              {ai?.enabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={genTags.isPending}
+                  onClick={() =>
+                    genTags.mutate({
+                      title: form.getFieldValue("title"),
+                      description: form.getFieldValue("description"),
+                    })
+                  }
+                >
+                  <Sparkles className="size-3" />
+                  {genTags.isPending ? "Thinking…" : "Suggest tags"}
+                </Button>
+              )}
+            </div>
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions
+                  .filter((name) => !(tags ?? []).some((t) => field.state.value.includes(t.id) && t.name === name))
+                  .map((name) => {
+                    const tag = (tags ?? []).find((t) => t.name === name)
+                    if (!tag || field.state.value.includes(tag.id)) return null
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
+                        onClick={() => field.handleChange([...field.state.value, tag.id])}
+                      >
+                        + {name}
+                      </button>
+                    )
+                  })}
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               {(tags ?? []).map((t) => {
                 const checked = field.state.value.includes(t.id)
