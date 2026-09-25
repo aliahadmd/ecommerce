@@ -252,6 +252,29 @@ export const createAddress = createServerFn({ method: "POST" })
     }),
   )
 
+export const setDefaultAddress = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const id = String((input as { id?: unknown })?.id ?? "")
+    if (!id) throw new AppError("INVALID", "id required")
+    return { id }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      const user = await requireUser()
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.addresses)
+          .set({ isDefault: false })
+          .where(eq(schema.addresses.userId, user.id))
+        await tx
+          .update(schema.addresses)
+          .set({ isDefault: true })
+          .where(and(eq(schema.addresses.id, data.id), eq(schema.addresses.userId, user.id)))
+      })
+      return { ok: true }
+    }),
+  )
+
 export const deleteAddress = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const id = String((input as { id?: unknown })?.id ?? "")
@@ -274,6 +297,15 @@ function orderNumber(): string {
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, "")
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
   return `ORD-${ymd}-${rand}`
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "23505"
+  )
 }
 
 export const placeOrder = createServerFn({ method: "POST" })
@@ -363,10 +395,14 @@ export const placeOrder = createServerFn({ method: "POST" })
           })
         }
 
-        const [order] = await tx
-          .insert(schema.orders)
-          .values({
-            orderNumber: orderNumber(),
+        // Retry on the (rare) order-number collision
+        let order!: typeof schema.orders.$inferSelect
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            ;[order] = await tx
+              .insert(schema.orders)
+              .values({
+                orderNumber: orderNumber(),
             buyerId: user.id,
             status: "pending",
             paymentMethod: "cod",
@@ -382,9 +418,17 @@ export const placeOrder = createServerFn({ method: "POST" })
             shipCity: address.city,
             shipState: address.state,
             shipPostalCode: address.postalCode,
-            shipCountry: address.country,
-          })
-          .returning()
+                shipCountry: address.country,
+              })
+              .returning()
+            break
+          } catch (err) {
+            if (isUniqueViolation(err) && attempt === 2) {
+              throw new AppError("INTERNAL", "Could not allocate an order number — please retry")
+            }
+            if (!isUniqueViolation(err)) throw err
+          }
+        }
 
         await tx.insert(schema.orderItems).values(
           orderItems.map((i) => ({ ...i, orderId: order.id })),

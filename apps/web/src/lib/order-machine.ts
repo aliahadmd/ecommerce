@@ -40,16 +40,3 @@ export function canMarkPaid(status: OrderStatus, paymentStatus: PaymentStatus, v
   if (viewer.role === "super_admin") return true
   return status === "delivered"
 }
-
-export function nextAllowedActions(
-  order: { status: OrderStatus; paymentStatus: PaymentStatus; buyerId: string; shopIds: string[] },
-  viewer: OrderViewer,
-): OrderStatus[] {
-  const transitions = ORDER_TRANSITIONS[order.status].filter((to) =>
-    to === "cancelled" ? canCancel(order, viewer) : true,
-  )
-  if (viewer.role === "seller" && order.status !== "pending" && order.status !== "confirmed" && order.status !== "shipped") {
-    // sellers only advance orders containing their items — scope enforced by query
-  }
-  return transitions
-}

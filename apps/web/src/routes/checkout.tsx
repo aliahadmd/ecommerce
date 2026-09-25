@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { toast } from "sonner"
+import { formatMoney } from "@ecommerce/config"
 import { createAddress, getCart, listAddresses, placeOrder } from "@/server/commerce"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
@@ -185,17 +186,13 @@ function CheckoutPage() {
                 <span className="line-clamp-1">
                   {i.title} × {i.quantity}
                 </span>
-                <span>{i.priceCents * i.quantity / 100} {currency}</span>
+                <span>{formatMoney(i.priceCents * i.quantity, currency)}</span>
               </div>
             ))}
             <div className="border-t pt-2 font-semibold">
               <div className="flex justify-between">
                 <span>Total — cash on delivery</span>
-                <span>
-                  {new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
-                    cart.subtotalCents / 100,
-                  )}
-                </span>
+                <span>{formatMoney(cart.subtotalCents, currency)}</span>
               </div>
             </div>
             <Button className="w-full" size="lg" onClick={place} disabled={placing || !chosen}>

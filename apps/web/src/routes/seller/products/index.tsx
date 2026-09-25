@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   createColumnHelper,
@@ -25,6 +25,11 @@ import {
 
 export const Route = createFileRoute("/seller/products/")({
   validateSearch: z.object({ page: z.coerce.number().optional(), q: z.string().optional() }),
+  beforeLoad: ({ context }) => {
+    if (context.session?.role === "buyer") {
+      throw redirect({ to: "/seller/onboarding" })
+    }
+  },
   component: SellerProductsPage,
 })
 
@@ -45,10 +50,13 @@ function SellerProductsPage() {
   const search = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ["seller-products", search],
     queryFn: () => listSellerProducts({ data: { page: search.page ?? 1, q: search.q } }).then(unwrap),
   })
+  if (isError) {
+    return <p className="text-destructive py-8">{error.message}</p>
+  }
 
   const setStatus = useMutation({
     mutationFn: (input: { id: string; status: "active" | "archived" }) =>
@@ -61,7 +69,7 @@ function SellerProductsPage() {
     },
   })
 
-  const rows: Row[] = data?.rows ?? []
+  const rows = data?.rows ?? []
   const columns = [
     col.display({
       id: "image",

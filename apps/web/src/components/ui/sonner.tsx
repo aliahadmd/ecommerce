@@ -1,5 +1,6 @@
 import { Toaster as Sonner  } from "sonner"
 import type {ToasterProps} from "sonner";
+import { useTheme } from "@/lib/theme"
 import {
   CircleCheckIcon,
   InfoIcon,
@@ -10,9 +11,10 @@ import {
 
 // TanStack Start (not Next.js): theme handled manually, no next-themes.
 const Toaster = ({ ...props }: ToasterProps) => {
+  const theme = useTheme()
   return (
     <Sonner
-      theme="light" /* flipped to "dark" by the theme toggle (plan-9) */
+      theme={theme}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

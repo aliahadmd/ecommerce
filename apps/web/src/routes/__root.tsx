@@ -28,6 +28,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
     ],
+    scripts: [
+      {
+        // Apply the persisted theme before first paint (no flash)
+        children: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,
+      },
+    ],
   }),
   // Loaded on the server for SSR and re-checked on every client navigation.
   beforeLoad: async () => {

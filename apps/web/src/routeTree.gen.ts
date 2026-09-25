@@ -20,10 +20,10 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SellerRouteImport } from './routes/seller'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
+import { Route as AccountAddressesRouteImport } from './routes/account/addresses'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
 import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ProductsIndexRouteImport } from './routes/products/index'
 import { Route as ProductsSlugRouteImport } from './routes/products/$slug'
@@ -93,6 +93,11 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
   path: '/account/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountAddressesRoute = AccountAddressesRouteImport.update({
+  id: '/account/addresses',
+  path: '/account/addresses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -106,11 +111,6 @@ const AdminCatalogRoute = AdminCatalogRouteImport.update({
 const AdminOrdersRoute = AdminOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -190,9 +190,9 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
+  '/account/addresses': typeof AccountAddressesRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
-  '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -218,9 +218,9 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/account/addresses': typeof AccountAddressesRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
-  '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -249,9 +249,9 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
+  '/account/addresses': typeof AccountAddressesRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
-  '/admin/users': typeof AdminUsersRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -281,9 +281,9 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/seller'
     | '/verify-email'
+    | '/account/addresses'
     | '/admin/catalog'
     | '/admin/orders'
-    | '/admin/users'
     | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
@@ -309,9 +309,9 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/verify-email'
+    | '/account/addresses'
     | '/admin/catalog'
     | '/admin/orders'
-    | '/admin/users'
     | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
@@ -339,9 +339,9 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/seller'
     | '/verify-email'
+    | '/account/addresses'
     | '/admin/catalog'
     | '/admin/orders'
-    | '/admin/users'
     | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
@@ -370,6 +370,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SellerRoute: typeof SellerRouteWithChildren
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AccountAddressesRoute: typeof AccountAddressesRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
   ShopsSlugRoute: typeof ShopsSlugRoute
@@ -459,6 +460,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/addresses': {
+      id: '/account/addresses'
+      path: '/account/addresses'
+      fullPath: '/account/addresses'
+      preLoaderRoute: typeof AccountAddressesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -478,13 +486,6 @@ declare module '@tanstack/react-router' {
       path: '/orders'
       fullPath: '/admin/orders'
       preLoaderRoute: typeof AdminOrdersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/api/health': {
@@ -584,14 +585,12 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminCatalogRoute: typeof AdminCatalogRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
-  AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCatalogRoute: AdminCatalogRoute,
   AdminOrdersRoute: AdminOrdersRoute,
-  AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
@@ -629,6 +628,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SellerRoute: SellerRouteWithChildren,
   VerifyEmailRoute: VerifyEmailRoute,
+  AccountAddressesRoute: AccountAddressesRoute,
   ApiHealthRoute: ApiHealthRoute,
   ProductsSlugRoute: ProductsSlugRoute,
   ShopsSlugRoute: ShopsSlugRoute,

@@ -50,6 +50,9 @@ function AccountPage() {
             <Button render={<Link to="/account/orders" search={{}} />} variant="outline">
               My orders
             </Button>
+            <Button render={<Link to="/account/addresses" search={{}} />} variant="outline">
+              Addresses
+            </Button>
             {user.role === "buyer" && user.emailVerified && (
               <Button render={<Link to="/seller/onboarding" />}>
                 Become a seller

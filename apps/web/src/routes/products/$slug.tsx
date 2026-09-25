@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
@@ -29,10 +30,20 @@ function ProductDetailPage() {
     queryFn: () => getProduct({ data: { slug } }).then(unwrap),
   })
 
+  const navigate = useNavigate()
+  const [quantity, setQuantity] = useState(1)
   const add = useMutation({
-    mutationFn: (quantity: number) => addToCart({ data: { productId: product.id, quantity } }),
+    mutationFn: (qty: number) => addToCart({ data: { productId: product.id, quantity: qty } }),
     onSuccess: (r) => {
       if (!r.ok) {
+        // Send unauthenticated visitors to login instead of a dead-end toast
+        if (r.error.code === "UNAUTHORIZED") {
+          void navigate({
+            to: "/login",
+            search: { redirect: `/products/${product.slug}` },
+          })
+          return
+        }
         toast.error(r.error.message)
         return
       }
@@ -137,9 +148,30 @@ function ProductDetailPage() {
           )}
 
           <div className="mt-6 flex items-center gap-2">
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Decrease quantity"
+                disabled={quantity <= 1}
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                −
+              </Button>
+              <span className="w-10 text-center text-sm font-medium">{quantity}</span>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Increase quantity"
+                disabled={product.stock === 0 || quantity >= product.stock}
+                onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
+              >
+                +
+              </Button>
+            </div>
             <Button
               disabled={product.stock === 0 || add.isPending}
-              onClick={() => add.mutate(1)}
+              onClick={() => add.mutate(quantity)}
             >
               Add to cart
             </Button>

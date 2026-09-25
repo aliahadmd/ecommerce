@@ -4,6 +4,21 @@ import { cachedJson, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
+/** Escape LIKE/ILIKE wildcards so user input can't inject patterns. */
+function escapeLike(input: string): string {
+  return input.replace(/[\\%_]/g, "\\$&")
+}
+
+/** Distinguish Postgres unique-violations for friendly "already taken" errors. */
+export function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "23505"
+  )
+}
+
 const PAGE_SIZE = 12
 
 // ─── Public: categories & tags ───────────────────────────────────────────────
@@ -54,6 +69,26 @@ const categoryInput = (input: unknown) => {
   }
 }
 
+async function assertValidParent(parentId: string | null, selfId?: string): Promise<void> {
+  if (!parentId) return
+  const seen = new Set<string>()
+  let cursor: string | null = parentId
+  while (cursor) {
+    if (cursor === selfId) {
+      throw new AppError("INVALID", "A category cannot be its own ancestor")
+    }
+    if (seen.has(cursor)) break // defensive: pre-existing cycle
+    seen.add(cursor)
+    const [row] = await db
+      .select({ parentId: schema.categories.parentId })
+      .from(schema.categories)
+      .where(eq(schema.categories.id, cursor))
+      .limit(1)
+    if (!row) throw new AppError("INVALID", "Parent category not found")
+    cursor = row.parentId
+  }
+}
+
 async function uniqueSlug(
   table: typeof schema.categories | typeof schema.tags,
   name: string,
@@ -74,6 +109,7 @@ export const createCategory = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
+      await assertValidParent(data.parentId)
       const slug = await uniqueSlug(schema.categories, data.name)
       const [row] = await db
         .insert(schema.categories)
@@ -98,9 +134,7 @@ export const updateCategory = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
-      if (data.parentId === data.id) {
-        throw new AppError("INVALID", "A category cannot be its own parent")
-      }
+      await assertValidParent(data.parentId, data.id)
       const [row] = await db
         .update(schema.categories)
         .set({ name: data.name, description: data.description, parentId: data.parentId })
@@ -213,7 +247,7 @@ export const listProducts = createServerFn({ method: "GET" })
         eq(schema.shops.status, "active"),
       ]
       if (data.q) {
-        const like = `%${data.q}%`
+        const like = `%${escapeLike(data.q)}%`
         conditions.push(
           or(
             ilike(schema.products.title, like),
@@ -451,9 +485,10 @@ export const createProduct = createServerFn({ method: "POST" })
         .limit(1)
       if (taken) slug = slugWithSuffix(slug)
 
-      return db.transaction(async (tx) => {
-        const [product] = await tx
-          .insert(schema.products)
+      try {
+        return await db.transaction(async (tx) => {
+          const [product] = await tx
+            .insert(schema.products)
           .values({
             shopId: shop.id,
             categoryId: data.categoryId,
@@ -465,14 +500,20 @@ export const createProduct = createServerFn({ method: "POST" })
             status: data.status,
           })
           .returning()
-        if (data.tagIds.length > 0) {
-          await tx
-            .insert(schema.productTags)
-            .values(data.tagIds.map((tagId) => ({ productId: product.id, tagId })))
-            .onConflictDoNothing()
+          if (data.tagIds.length > 0) {
+            await tx
+              .insert(schema.productTags)
+              .values(data.tagIds.map((tagId) => ({ productId: product.id, tagId })))
+              .onConflictDoNothing()
+          }
+          return { id: product.id, slug: product.slug }
+        })
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw new AppError("TAKEN", "A product with a similar title already exists — try another title")
         }
-        return { id: product.id, slug: product.slug }
-      })
+        throw err
+      }
     }),
   )
 

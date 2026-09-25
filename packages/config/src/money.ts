@@ -2,8 +2,12 @@
  * Money is always stored as integer minor units (cents) — never floats.
  * The only place cents become display strings is formatMoney.
  */
-export function formatMoney(cents: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
+export function formatMoney(
+  cents: number,
+  currency = "USD",
+  locale = "en-US",
+): string {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
   }).format(cents / 100)

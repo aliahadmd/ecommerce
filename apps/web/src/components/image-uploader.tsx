@@ -24,12 +24,20 @@ export function ImageUploader({
 
   const upload = useMutation({
     mutationFn: async (files: FileList) => {
+      let uploaded = 0
+      const failed: string[] = []
       for (const file of files) {
         const fd = new FormData()
         fd.set("productId", productId)
         fd.set("file", file)
         const result = await uploadProductImage({ data: fd })
-        if (!result.ok) throw new Error(result.error.message)
+        if (result.ok) uploaded++
+        else failed.push(file.name)
+      }
+      if (failed.length > 0) {
+        throw new Error(
+          `Uploaded ${uploaded}/${files.length}. Failed: ${failed.join(", ")}`,
+        )
       }
     },
     onSuccess: () => {

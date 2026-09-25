@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getCart } from "@/server/commerce"
 import { roleLabels } from "@/lib/role"
 import { setCartCount, useCartCount } from "@/lib/cart-store"
+import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
 import { getSession  } from "@/server/session"
 import type {AppUser} from "@/server/session";
 import { ShoppingBag, Search, LogOut, User, Store, Shield } from "lucide-react"
@@ -26,6 +27,10 @@ export function Header({ user }: { user: AppUser | null }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const cartCount = useCartCount()
+
+  useEffect(() => {
+    initTheme()
+  }, [])
 
   // Keep the badge honest across reloads (the store starts at 0).
   useEffect(() => {
@@ -73,6 +78,7 @@ export function Header({ user }: { user: AppUser | null }) {
         </form>
 
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           <Button
             render={<Link to="/cart" search={{}} />}
             variant="ghost"
@@ -147,6 +153,20 @@ export function Header({ user }: { user: AppUser | null }) {
         </div>
       </div>
     </header>
+  )
+}
+
+function ThemeToggle() {
+  const theme = useTheme()
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      onClick={toggleTheme}
+    >
+      {theme === "dark" ? "☀️" : "🌙"}
+    </Button>
   )
 }
 

@@ -31,14 +31,22 @@ export function publicUrl(key: string): string {
   return `${getEnv().S3_PUBLIC_URL}/${key}`
 }
 
-/** Idempotent: create the bucket if it doesn't exist (dev convenience). */
+/** Idempotent: create the bucket if it doesn't exist (dev convenience).
+ *  Other HeadBucket failures (auth, network) are rethrown — masking them
+ *  turned real outages into confusing CreateBucket errors. */
 export async function ensureBucket(): Promise<void> {
   const s3 = getS3()
   const Bucket = getEnv().S3_BUCKET
   try {
     await s3.send(new HeadBucketCommand({ Bucket }))
-  } catch {
-    await s3.send(new CreateBucketCommand({ Bucket }))
+  } catch (err) {
+    const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata
+      ?.httpStatusCode
+    if (status === 404) {
+      await s3.send(new CreateBucketCommand({ Bucket }))
+      return
+    }
+    throw err
   }
 }
 

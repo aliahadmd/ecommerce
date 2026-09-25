@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { toast } from "sonner"
 import { createProduct } from "@/server/catalog"
@@ -7,6 +7,11 @@ import type {ProductFormValues} from "@/components/product-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const Route = createFileRoute("/seller/products/new")({
+  beforeLoad: ({ context }) => {
+    if (context.session?.role === "buyer") {
+      throw redirect({ to: "/seller/onboarding" })
+    }
+  },
   component: NewProductPage,
 })
 
