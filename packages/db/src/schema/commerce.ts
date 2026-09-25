@@ -151,6 +151,26 @@ export const orderItems = pgTable(
   ],
 );
 
+export const wishlistItems = pgTable(
+  "wishlist_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("wishlist_items_user_product_unique").on(t.userId, t.productId),
+    index("wishlist_items_user_idx").on(t.userId, t.createdAt),
+  ],
+)
+
 // better-auth database rate-limit storage (survives restarts, works across
 // instances) — enabled via `rateLimit.storage: "database"` in packages/auth.
 // better-auth reads/writes lastRequest as epoch milliseconds.

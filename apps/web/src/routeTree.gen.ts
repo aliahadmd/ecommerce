@@ -21,6 +21,7 @@ import { Route as SellerRouteImport } from './routes/seller'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as AccountAddressesRouteImport } from './routes/account/addresses'
+import { Route as AccountWishlistRouteImport } from './routes/account/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
 import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
@@ -96,6 +97,11 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
 const AccountAddressesRoute = AccountAddressesRouteImport.update({
   id: '/account/addresses',
   path: '/account/addresses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountWishlistRoute = AccountWishlistRouteImport.update({
+  id: '/account/wishlist',
+  path: '/account/wishlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/api/health': typeof ApiHealthRoute
@@ -219,6 +226,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/api/health': typeof ApiHealthRoute
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/api/health': typeof ApiHealthRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/seller'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/orders'
     | '/api/health'
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/orders'
     | '/api/health'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/seller'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/orders'
     | '/api/health'
@@ -371,6 +383,7 @@ export interface RootRouteChildren {
   SellerRoute: typeof SellerRouteWithChildren
   VerifyEmailRoute: typeof VerifyEmailRoute
   AccountAddressesRoute: typeof AccountAddressesRoute
+  AccountWishlistRoute: typeof AccountWishlistRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
   ShopsSlugRoute: typeof ShopsSlugRoute
@@ -465,6 +478,13 @@ declare module '@tanstack/react-router' {
       path: '/account/addresses'
       fullPath: '/account/addresses'
       preLoaderRoute: typeof AccountAddressesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/wishlist': {
+      id: '/account/wishlist'
+      path: '/account/wishlist'
+      fullPath: '/account/wishlist'
+      preLoaderRoute: typeof AccountWishlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -629,6 +649,7 @@ const rootRouteChildren: RootRouteChildren = {
   SellerRoute: SellerRouteWithChildren,
   VerifyEmailRoute: VerifyEmailRoute,
   AccountAddressesRoute: AccountAddressesRoute,
+  AccountWishlistRoute: AccountWishlistRoute,
   ApiHealthRoute: ApiHealthRoute,
   ProductsSlugRoute: ProductsSlugRoute,
   ShopsSlugRoute: ShopsSlugRoute,

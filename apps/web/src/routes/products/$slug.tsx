@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { addToCart } from "@/server/commerce"
 import { getProduct, listRelatedProducts } from "@/server/catalog"
 import { ProductCard } from "@/components/product-card"
+import { useWishlistSet, WishlistHeart } from "@/components/wishlist-heart"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
@@ -191,6 +192,7 @@ function ProductDetailPage() {
           )}
 
           <div className="mt-6 flex items-center gap-2">
+            <WishlistHeart productId={product.id} savedSet={new Set()} />
             <div className="flex items-center">
               <Button
                 variant="outline"
@@ -242,13 +244,15 @@ function RelatedProducts({ slug }: { slug: string }) {
     queryFn: () => listRelatedProducts({ data: { slug } }).then(unwrap),
     staleTime: 60_000,
   })
+  const wishlist = useWishlistSet((related ?? []).map((p) => p.id))
+  const wishlistCtx = { savedSet: wishlist.savedSet, queryKey: ["related", slug] }
   if (!related || related.length === 0) return null
   return (
     <section className="mt-12">
       <h2 className="mb-4 text-lg font-semibold">Related products</h2>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {related.map((p) => (
-          <ProductCard key={p.id} product={p} />
+          <ProductCard key={p.id} product={p} wishlist={wishlistCtx} />
         ))}
       </div>
     </section>

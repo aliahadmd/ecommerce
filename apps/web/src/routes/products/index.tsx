@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { unwrap } from "@/lib/unwrap"
+import { useWishlistSet } from "@/components/wishlist-heart"
 import {
   Select,
   SelectContent,
@@ -62,6 +63,8 @@ function ProductsPage() {
     ? Math.max(1, Math.ceil(data.total / data.pageSize))
     : 1
   const items = data?.items
+  const wishlist = useWishlistSet((items ?? []).map((p) => p.id))
+  const wishlistCtx = { savedSet: wishlist.savedSet, queryKey: ["products", search] }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -195,7 +198,7 @@ function ProductsPage() {
           ? Array.from({ length: 12 }).map((_, i) => (
               <Skeleton key={i} className="aspect-4/3 w-full" />
             ))
-          : items.map((p) => <ProductCard key={p.id} product={p} />)}
+          : items.map((p) => <ProductCard key={p.id} product={p} wishlist={wishlistCtx} />)}
       </div>
 
       {items?.length === 0 && (

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { getCategories, listProducts } from "@/server/catalog"
 import { ProductCard } from "@/components/product-card"
+import { useWishlistSet } from "@/components/wishlist-heart"
 import { Skeleton } from "@/components/ui/skeleton"
 import { unwrap } from "@/lib/unwrap"
 
@@ -28,6 +29,9 @@ function HomePage() {
     queryKey: ["categories"],
     queryFn: () => getCategories().then(unwrap),
   })
+
+  const wishlist = useWishlistSet((products?.items ?? []).map((p) => p.id))
+  const wishlistCtx = { savedSet: wishlist.savedSet, queryKey: ["products", {}] }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -62,7 +66,7 @@ function HomePage() {
             ))
           : products.items
               .slice(0, 8)
-              .map((p) => <ProductCard key={p.id} product={p} />)}
+              .map((p) => <ProductCard key={p.id} product={p} wishlist={wishlistCtx} />)}
       </div>
     </main>
   )

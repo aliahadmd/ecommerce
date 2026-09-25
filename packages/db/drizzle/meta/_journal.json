@@ -43,6 +43,13 @@
       "when": 1790351990376,
       "tag": "0005_swift_psynapse",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790352591725,
+      "tag": "0006_wild_layla_miller",
+      "breakpoints": true
     }
   ]
 }

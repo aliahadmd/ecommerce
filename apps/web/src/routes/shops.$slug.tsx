@@ -5,6 +5,7 @@ import { ProductCard } from "@/components/product-card"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { unwrap } from "@/lib/unwrap"
+import { useWishlistSet } from "@/components/wishlist-heart"
 
 export const Route = createFileRoute("/shops/$slug")({
   loader: async ({ context: { queryClient }, params }) => {
@@ -22,6 +23,8 @@ function ShopPage() {
     queryKey: ["shop", slug],
     queryFn: () => getShop({ data: { slug } }).then(unwrap),
   })
+  const wishlist = useWishlistSet((data?.items ?? []).map((p) => p.id))
+  const wishlistCtx = { savedSet: wishlist.savedSet, queryKey: ["shop", slug] }
 
   if (!data) {
     return (
@@ -46,7 +49,7 @@ function ShopPage() {
       </Card>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {items.map((p) => (
-          <ProductCard key={p.id} product={p} />
+          <ProductCard key={p.id} product={p} wishlist={wishlistCtx} />
         ))}
       </div>
       {items.length === 0 && (

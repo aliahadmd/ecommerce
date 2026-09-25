@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { formatMoney } from "@ecommerce/config"
 import { Badge } from "@/components/ui/badge"
+import { WishlistHeart } from "@/components/wishlist-heart"
 import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 
 export interface ProductCardData {
@@ -19,7 +20,23 @@ export interface ProductCardData {
   ratingCount?: number
 }
 
-export function ProductCard({ product }: { product: ProductCardData }) {
+/**
+ * Wishlist wiring for card grids: the container resolves `savedSet` via
+ * `useWishlistSet` (one batched call per grid) and passes it + its query key.
+ * Omitted → no heart renders (e.g. admin tables).
+ */
+export interface CardGridWishlist {
+  savedSet: Set<string>
+  queryKey?: unknown[]
+}
+
+export function ProductCard({
+  product,
+  wishlist,
+}: {
+  product: ProductCardData
+  wishlist?: CardGridWishlist
+}) {
   return (
     <Card className="gap-0 overflow-hidden pt-0">
       <Link
@@ -70,6 +87,13 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           </Link>
         </div>
         <div className="flex items-center gap-1">
+          {wishlist && (
+            <WishlistHeart
+              productId={product.id}
+              savedSet={wishlist.savedSet}
+              queryKey={wishlist.queryKey}
+            />
+          )}
           {product.condition && product.condition !== "new" && (
             <Badge variant="outline" className="capitalize">
               {product.condition}
