@@ -1,14 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router"
-import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router"
+import { Shield } from "lucide-react"
 
-// Placeholder admin area — dashboard + user management in plan-9.
+/** Admin section layout: super_admin guard + sidebar (plan-9 polishes this). */
 export const Route = createFileRoute("/admin")({
   beforeLoad: ({ context }) => {
     if (!context.session) {
@@ -18,24 +11,45 @@ export const Route = createFileRoute("/admin")({
       throw redirect({ to: "/" })
     }
   },
-  component: AdminPlaceholder,
+  component: AdminLayout,
 })
 
-function AdminPlaceholder() {
-  const { session } = Route.useRouteContext()
+function AdminLayout() {
   return (
-    <main className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Admin area <Badge>{session!.role}</Badge>
-          </CardTitle>
-          <CardDescription>
-            Users, moderation, orders and dashboards land here in plan-9.
-          </CardDescription>
-        </CardHeader>
-        <CardContent />
-      </Card>
-    </main>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <nav className="mb-6 flex gap-1 text-sm">
+        <Link
+          to="/admin"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          <Shield className="mr-1.5 inline size-4" /> Dashboard
+        </Link>
+        <Link
+          to="/admin/users"
+          search={{}}
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Users
+        </Link>
+        <Link
+          to="/admin/catalog"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Catalog
+        </Link>
+        <Link
+          to="/admin/orders"
+          search={{}}
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Orders
+        </Link>
+      </nav>
+      <Outlet />
+    </div>
   )
 }

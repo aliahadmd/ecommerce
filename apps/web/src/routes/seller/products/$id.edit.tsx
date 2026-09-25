@@ -1,0 +1,85 @@
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+import { z } from "zod"
+import { toast } from "sonner"
+import { centsToDecimalString } from "@ecommerce/config"
+import { getProductForEdit, updateProduct } from "@/server/catalog"
+import { ProductForm, type ProductFormValues } from "@/components/product-form"
+import { ImageUploader } from "@/components/image-uploader"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { unwrap } from "@/lib/unwrap"
+
+export const Route = createFileRoute("/seller/products/$id/edit")({
+  validateSearch: z.object({}),
+  beforeLoad: ({ context }) => {
+    if (context.session?.role === "buyer") {
+      throw redirect({ to: "/seller/onboarding" })
+    }
+  },
+  component: EditProductPage,
+})
+
+function EditProductPage() {
+  const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [pending, setPending] = useState(false)
+
+  const { data, isError, error } = useQuery({
+    queryKey: ["product-edit", id],
+    queryFn: () => getProductForEdit({ data: { id } }).then(unwrap),
+  })
+  if (isError) {
+    return <p className="text-destructive py-8">{(error as Error).message}</p>
+  }
+
+  async function onSubmit(values: ProductFormValues) {
+    setPending(true)
+    const result = await updateProduct({ data: { id, ...values } })
+    setPending(false)
+    if (!result.ok) {
+      toast.error(result.error.message)
+      return
+    }
+    toast.success("Product saved")
+    void queryClient.invalidateQueries({ queryKey: ["seller-products"] })
+    void queryClient.invalidateQueries({ queryKey: ["product", result.data.slug] })
+    await navigate({ to: "/seller/products", search: { page: 1 } })
+  }
+
+  if (!data) {
+    return <Skeleton className="mx-auto h-96 max-w-2xl" />
+  }
+
+  const { product, images, tagIds } = data
+
+  return (
+    <Card className="mx-auto max-w-2xl">
+      <CardHeader>
+        <CardTitle>Edit product</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <h2 className="mb-2 text-sm font-medium">Images</h2>
+          <ImageUploader productId={id} images={images} />
+        </div>
+        <ProductForm
+          defaultValues={{
+            title: product.title,
+            description: product.description,
+            price: centsToDecimalString(product.priceCents),
+            stock: String(product.stock),
+            categoryId: product.categoryId,
+            tagIds,
+            status: product.status === "active" ? "active" : "draft",
+          }}
+          submitLabel="Save changes"
+          onSubmit={onSubmit}
+          pending={pending}
+        />
+      </CardContent>
+    </Card>
+  )
+}
