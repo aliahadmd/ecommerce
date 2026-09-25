@@ -5,3 +5,5 @@ packages:
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+dedupePeerDependents: false

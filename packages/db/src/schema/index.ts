@@ -1,2 +1,4 @@
-// Re-exported by src/index.ts. Real tables land in plan-4.
-export {}
+export * from "./auth"
+export * from "./shops"
+export * from "./catalog"
+export * from "./commerce"
