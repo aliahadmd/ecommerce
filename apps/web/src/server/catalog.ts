@@ -179,7 +179,7 @@ const productCardColumns = {
   shopSlug: schema.shops.slug,
   imageUrl: sql<string | null>`(
     select pi.url from product_images pi
-    where pi.product_id = ${schema.products.id}
+    where pi.product_id = "products"."id"
     order by pi.sort_order asc limit 1
   )`,
 }

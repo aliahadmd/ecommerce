@@ -427,7 +427,7 @@ const orderListColumns = {
   totalCents: schema.orders.totalCents,
   currency: schema.orders.currency,
   createdAt: schema.orders.createdAt,
-  itemCount: sql<number>`(select coalesce(sum(oi.quantity),0)::int from order_items oi where oi.order_id = ${schema.orders.id})`,
+  itemCount: sql<number>`(select coalesce(sum(oi.quantity),0)::int from order_items oi where oi.order_id = "orders"."id")`,
 }
 
 export const listMyOrders = createServerFn({ method: "GET" }).handler(() =>
