@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
 import { addToCart } from "@/server/commerce"
-import { getProduct } from "@/server/catalog"
+import { getProduct, listRelatedProducts } from "@/server/catalog"
+import { ProductCard } from "@/components/product-card"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +19,13 @@ export const Route = createFileRoute("/products/$slug")({
       queryKey: ["product", params.slug],
       queryFn: () => getProduct({ data: { slug: params.slug } }).then(unwrap),
     })
-    return { title: data.product.title, description: data.product.description.slice(0, 160) }
+    return {
+      title: data.product.seoTitle ?? data.product.title,
+      description:
+        data.product.seoDescription ??
+        data.product.summary ??
+        data.product.description.slice(0, 160),
+    }
   },
   head: ({ match }) => ({
     meta: [
@@ -148,6 +155,9 @@ function ProductDetailPage() {
 
         <div>
           <h1 className="text-2xl font-semibold">{product.title}</h1>
+          {product.summary && (
+            <p className="text-muted-foreground mt-1 text-sm">{product.summary}</p>
+          )}
           <div className="mt-2 flex items-center gap-3">
             <span className="text-2xl font-bold">
               {formatMoney(product.priceCents, product.currency)}
@@ -220,6 +230,27 @@ function ProductDetailPage() {
           </p>
         </div>
       </div>
+
+      <RelatedProducts slug={slug} />
     </main>
+  )
+}
+
+function RelatedProducts({ slug }: { slug: string }) {
+  const { data: related } = useQuery({
+    queryKey: ["related", slug],
+    queryFn: () => listRelatedProducts({ data: { slug } }).then(unwrap),
+    staleTime: 60_000,
+  })
+  if (!related || related.length === 0) return null
+  return (
+    <section className="mt-12">
+      <h2 className="mb-4 text-lg font-semibold">Related products</h2>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        {related.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
+    </section>
   )
 }

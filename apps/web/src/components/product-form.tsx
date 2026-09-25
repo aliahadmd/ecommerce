@@ -31,6 +31,21 @@ const productFormSchema = z.object({
   categoryId: z.string().nullable(),
   tagIds: z.array(z.string()),
   status: z.enum(["draft", "active"]),
+  brand: z.string().max(80),
+  summary: z.string().max(300),
+  condition: z.enum(["new", "used", "refurbished"]),
+  weightGrams: z
+    .string()
+    .regex(/^\d*$/, "Whole grams")
+    .max(7),
+  dimensions: z.object({
+    l: z.string().regex(/^\d*$/, "mm"),
+    w: z.string().regex(/^\d*$/, "mm"),
+    h: z.string().regex(/^\d*$/, "mm"),
+  }),
+  seoTitle: z.string().max(200),
+  seoDescription: z.string().max(300),
+  lowStockThreshold: stockSchema,
 })
 
 export interface ProductFormValues {
@@ -41,6 +56,14 @@ export interface ProductFormValues {
   categoryId: string | null
   tagIds: string[]
   status: "draft" | "active"
+  brand: string
+  summary: string
+  condition: "new" | "used" | "refurbished"
+  weightGrams: string
+  dimensions: { l: string; w: string; h: string }
+  seoTitle: string
+  seoDescription: string
+  lowStockThreshold: string
 }
 
 function errMsg(e: unknown): string {
@@ -118,6 +141,14 @@ export function ProductForm({
         categoryId: value.categoryId || null,
         tagIds: value.tagIds,
         status: value.status,
+        brand: value.brand.trim() || "",
+        summary: value.summary.trim() || "",
+        condition: value.condition,
+        weightGrams: value.weightGrams.trim() || "",
+        dimensions: value.dimensions,
+        seoTitle: value.seoTitle.trim() || "",
+        seoDescription: value.seoDescription.trim() || "",
+        lowStockThreshold: value.lowStockThreshold.trim() || "5",
       }),
   })
 
@@ -348,6 +379,146 @@ export function ProductForm({
           </div>
         )}
       </form.Field>
+
+      <div className="border-t pt-4">
+        <h3 className="mb-3 text-sm font-medium">Details</h3>
+        <div className="space-y-4">
+          <form.Field name="brand" validators={{ onChange: productFormSchema.shape.brand }}>
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+          <form.Field name="summary" validators={{ onChange: productFormSchema.shape.summary }}>
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="summary">
+                  Short summary{" "}
+                  <span className="text-muted-foreground">({field.state.value.length}/300)</span>
+                </Label>
+                <Textarea
+                  id="summary"
+                  rows={2}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+          <form.Field name="condition">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label>Condition</Label>
+                <RadioGroup
+                  value={field.state.value}
+                  onValueChange={(v) => field.handleChange(v as "new" | "used" | "refurbished")}
+                  className="flex gap-4"
+                >
+                  {(["new", "used", "refurbished"] as const).map((c) => (
+                    <label key={c} className="flex items-center gap-2 text-sm capitalize">
+                      <RadioGroupItem value={c} /> {c}
+                    </label>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
+          </form.Field>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <form.Field name="weightGrams" validators={{ onChange: productFormSchema.shape.weightGrams }}>
+              {(field) => (
+                <div className="space-y-1.5">
+                  <Label htmlFor="weight">Weight (g)</Label>
+                  <Input
+                    id="weight"
+                    inputMode="numeric"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                </div>
+              )}
+            </form.Field>
+            {(["l", "w", "h"] as const).map((axis) => (
+              <form.Field key={axis} name={`dimensions.${axis}`} validators={{ onChange: productFormSchema.shape.dimensions.shape[axis] }}>
+                {(field) => (
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`dim-${axis}`}>{axis.toUpperCase()} (mm)</Label>
+                    <Input
+                      id={`dim-${axis}`}
+                      inputMode="numeric"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                    />
+                  </div>
+                )}
+              </form.Field>
+            ))}
+          </div>
+          <form.Field
+            name="lowStockThreshold"
+            validators={{ onChange: productFormSchema.shape.lowStockThreshold }}
+          >
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="lowStock">Low-stock alert at</Label>
+                <Input
+                  id="lowStock"
+                  inputMode="numeric"
+                  className="max-w-24"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="mb-3 text-sm font-medium">SEO (optional)</h3>
+        <div className="space-y-4">
+          <form.Field name="seoTitle" validators={{ onChange: productFormSchema.shape.seoTitle }}>
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="seoTitle">SEO title</Label>
+                <Input
+                  id="seoTitle"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+          <form.Field
+            name="seoDescription"
+            validators={{ onChange: productFormSchema.shape.seoDescription }}
+          >
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="seoDesc">SEO description</Label>
+                <Textarea
+                  id="seoDesc"
+                  rows={2}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+        </div>
+      </div>
 
       <form.Field name="status">
         {(field) => (

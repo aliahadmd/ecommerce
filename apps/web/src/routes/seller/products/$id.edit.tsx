@@ -77,6 +77,18 @@ function EditProductPage() {
             categoryId: product.categoryId,
             tagIds,
             status: product.status === "active" ? "active" : "draft",
+            brand: product.brand ?? "",
+            summary: product.summary ?? "",
+            condition: product.condition,
+            weightGrams: product.weightGrams === null ? "" : String(product.weightGrams),
+            dimensions: {
+              l: String(product.dimensions?.l ?? ""),
+              w: String(product.dimensions?.w ?? ""),
+              h: String(product.dimensions?.h ?? ""),
+            },
+            seoTitle: product.seoTitle ?? "",
+            seoDescription: product.seoDescription ?? "",
+            lowStockThreshold: String(product.lowStockThreshold),
           }}
           submitLabel="Save changes"
           onSubmit={onSubmit}

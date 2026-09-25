@@ -13,6 +13,10 @@ export interface ProductCardData {
   shopName: string
   shopSlug: string
   imageUrl: string | null
+  brand?: string | null
+  condition?: "new" | "used" | "refurbished"
+  ratingAvg?: number
+  ratingCount?: number
 }
 
 export function ProductCard({ product }: { product: ProductCardData }) {
@@ -48,6 +52,9 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             {product.title}
           </Link>
         </CardTitle>
+        {product.brand && (
+          <p className="text-muted-foreground mt-0.5 text-xs">{product.brand}</p>
+        )}
       </CardContent>
       <CardFooter className="justify-between gap-2 pb-4">
         <div>
@@ -62,7 +69,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             {product.shopName}
           </Link>
         </div>
-        {product.stock === 0 && <Badge variant="secondary">Out of stock</Badge>}
+        <div className="flex items-center gap-1">
+          {product.condition && product.condition !== "new" && (
+            <Badge variant="outline" className="capitalize">
+              {product.condition}
+            </Badge>
+          )}
+          {product.stock === 0 && <Badge variant="secondary">Out of stock</Badge>}
+        </div>
       </CardFooter>
     </Card>
   )

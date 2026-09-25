@@ -4,6 +4,7 @@ import {
   char,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -15,6 +16,12 @@ import {
 import { shops } from "./shops";
 
 export const productStatus = pgEnum("product_status", ["draft", "active", "archived"]);
+
+export const productCondition = pgEnum("product_condition", [
+  "new",
+  "used",
+  "refurbished",
+]);
 
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -56,6 +63,15 @@ export const products = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description").notNull(),
+    summary: text("summary"),
+    brand: text("brand"),
+    condition: productCondition("condition").notNull().default("new"),
+    weightGrams: integer("weight_grams"),
+    dimensions: jsonb("dimensions")
+      .$type<{ l: number; w: number; h: number } | null>(), // { l, w, h } in mm
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     /** Integer minor units (cents) — never floats. */
     priceCents: integer("price_cents").notNull(),
     currency: char("currency", { length: 3 }).notNull().default("USD"),
@@ -73,6 +89,8 @@ export const products = pgTable(
     index("products_title_trgm_idx").using("gin", sql`${t.title} gin_trgm_ops`),
     check("products_price_cents_check", sql`${t.priceCents} >= 0`),
     check("products_stock_check", sql`${t.stock} >= 0`),
+    check("products_weight_grams_check", sql`${t.weightGrams} >= 0`),
+    check("products_low_stock_threshold_check", sql`${t.lowStockThreshold} >= 0`),
   ],
 );
 

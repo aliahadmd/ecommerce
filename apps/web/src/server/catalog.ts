@@ -248,6 +248,8 @@ const productCardColumns = {
   stock: schema.products.stock,
   shopName: schema.shops.name,
   shopSlug: schema.shops.slug,
+  brand: schema.products.brand,
+  condition: schema.products.condition,
   imageUrl: sql<string | null>`(
     select pi.url from product_images pi
     where pi.product_id = "products"."id"
@@ -530,7 +532,49 @@ const productFields = (input: unknown) => {
     throw new AppError("INVALID", "Stock must be a non-negative whole number")
   }
   if (tagIds.length > 10) throw new AppError("INVALID", "Max 10 tags")
-  return { title, description, priceCents, stock, status, categoryId, tagIds }
+
+  const brand = raw.brand ? String(raw.brand).trim().slice(0, 80) : null
+  const summary = raw.summary ? String(raw.summary).trim().slice(0, 300) : null
+  const condition = ["new", "used", "refurbished"].includes(String(raw.condition))
+    ? (String(raw.condition) as "new" | "used" | "refurbished")
+    : "new"
+  const weightGrams =
+    raw.weightGrams === undefined || raw.weightGrams === null || raw.weightGrams === ""
+      ? null
+      : Number(raw.weightGrams)
+  if (weightGrams !== null && (!Number.isInteger(weightGrams) || weightGrams < 0)) {
+    throw new AppError("INVALID", "Weight must be a non-negative whole number of grams")
+  }
+  let dimensions: { l: number; w: number; h: number } | null = null
+  if (
+    raw.dimensions &&
+    typeof raw.dimensions === "object" &&
+    !Array.isArray(raw.dimensions)
+  ) {
+    const d = raw.dimensions as Record<string, unknown>
+    const l = Number(d.l)
+    const w = Number(d.w)
+    const h = Number(d.h)
+    const ok = [l, w, h].every((n) => Number.isInteger(n) && n >= 0 && n <= 100000)
+    if (!ok) throw new AppError("INVALID", "Dimensions must be whole millimetres (0–100000)")
+    dimensions = { l, w, h }
+  }
+  const seoTitle = raw.seoTitle ? String(raw.seoTitle).trim().slice(0, 200) : null
+  const seoDescription = raw.seoDescription
+    ? String(raw.seoDescription).trim().slice(0, 300)
+    : null
+  const lowStockThreshold =
+    raw.lowStockThreshold === undefined || raw.lowStockThreshold === ""
+      ? 5
+      : Number(raw.lowStockThreshold)
+  if (!Number.isInteger(lowStockThreshold) || lowStockThreshold < 0) {
+    throw new AppError("INVALID", "Low-stock threshold must be a non-negative whole number")
+  }
+
+  return {
+    title, description, priceCents, stock, status, categoryId, tagIds,
+    brand, summary, condition, weightGrams, dimensions, seoTitle, seoDescription, lowStockThreshold,
+  }
 }
 
 export const createProduct = createServerFn({ method: "POST" })
@@ -557,6 +601,14 @@ export const createProduct = createServerFn({ method: "POST" })
               title: data.title,
               slug,
               description: data.description,
+              summary: data.summary,
+              brand: data.brand,
+              condition: data.condition,
+              weightGrams: data.weightGrams,
+              dimensions: data.dimensions,
+              seoTitle: data.seoTitle,
+              seoDescription: data.seoDescription,
+              lowStockThreshold: data.lowStockThreshold,
               priceCents: data.priceCents,
               stock: data.stock,
               status: data.status,
@@ -651,6 +703,14 @@ export const updateProduct = createServerFn({ method: "POST" })
             categoryId: data.categoryId,
             title: data.title,
             description: data.description,
+            summary: data.summary,
+            brand: data.brand,
+            condition: data.condition,
+            weightGrams: data.weightGrams,
+            dimensions: data.dimensions,
+            seoTitle: data.seoTitle,
+            seoDescription: data.seoDescription,
+            lowStockThreshold: data.lowStockThreshold,
             priceCents: data.priceCents,
             stock: data.stock,
             status: data.status,
@@ -754,4 +814,117 @@ export const adminListProductsByIds = createServerFn({ method: "GET" })
         .from(schema.products)
         .where(inArray(schema.products.id, data.ids))
     })
+  )
+
+// ── Image reordering (plan-2) ───────────────────────────────────────────────
+
+export const reorderProductImages = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const raw = input as { productId?: unknown; imageIds?: unknown }
+    const productId = String(raw.productId ?? "")
+    const imageIds = Array.isArray(raw.imageIds) ? raw.imageIds.map(String) : []
+    if (!productId || imageIds.length === 0) {
+      throw new AppError("INVALID", "productId and imageIds required")
+    }
+    return { productId, imageIds }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      const user = await requireRole("seller", "super_admin")
+      const [row] = await db
+        .select({ ownerId: schema.shops.ownerId })
+        .from(schema.products)
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .where(eq(schema.products.id, data.productId))
+        .limit(1)
+      if (!row) throw new AppError("NOT_FOUND", "Product not found")
+      if (user.role !== "super_admin" && user.id !== row.ownerId) {
+        throw new AppError("FORBIDDEN", "You can only manage your own products")
+      }
+      const existing = await db
+        .select({ id: schema.productImages.id })
+        .from(schema.productImages)
+        .where(eq(schema.productImages.productId, data.productId))
+      const existingIds = new Set(existing.map((i) => i.id))
+      if (
+        data.imageIds.length !== existingIds.size ||
+        data.imageIds.some((id) => !existingIds.has(id))
+      ) {
+        throw new AppError("INVALID", "Image list does not match this product's images")
+      }
+      await db.transaction(async (tx) => {
+        for (const [i, id] of data.imageIds.entries()) {
+          await tx
+            .update(schema.productImages)
+            .set({ sortOrder: i })
+            .where(eq(schema.productImages.id, id))
+        }
+      })
+      return { ok: true }
+    }),
+  )
+
+// ── Related products (plan-2): same category, else same shop ────────────────
+
+export const listRelatedProducts = createServerFn({ method: "GET" })
+  .validator((input: unknown) => {
+    const raw = input as { slug?: unknown; limit?: unknown }
+    const slug = String(raw.slug ?? "")
+    if (!slug) throw new AppError("INVALID", "slug required")
+    const limit = Math.min(8, Math.max(2, Number(raw.limit ?? 4)))
+    return { slug, limit }
+  })
+  .handler(({ data }) =>
+    guard(async () => {
+      const [row] = await db
+        .select({
+          id: schema.products.id,
+          categoryId: schema.products.categoryId,
+          shopId: schema.products.shopId,
+        })
+        .from(schema.products)
+        .where(eq(schema.products.slug, data.slug))
+        .limit(1)
+      if (!row) throw new AppError("NOT_FOUND", "Product not found")
+
+      const base = db
+        .select(productCardColumns)
+        .from(schema.products)
+        .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+        .$dynamic()
+
+      const sameCategory = row.categoryId
+        ? await base
+            .where(
+              and(
+                eq(schema.products.status, "active"),
+                eq(schema.shops.status, "active"),
+                eq(schema.products.categoryId, row.categoryId),
+                sql`${schema.products.id} <> ${row.id}`,
+              ),
+            )
+            .orderBy(desc(schema.products.createdAt))
+            .limit(data.limit)
+        : []
+      if (sameCategory.length >= data.limit) return sameCategory
+
+      const exclude = new Set([row.id, ...sameCategory.map((p) => p.id)])
+      const fillers = await base
+        .where(
+          and(
+            eq(schema.products.status, "active"),
+            eq(schema.shops.status, "active"),
+            eq(schema.products.shopId, row.shopId),
+            sql`${schema.products.id} <> ${row.id}`,
+          ),
+        )
+        .orderBy(desc(schema.products.createdAt))
+        .limit(data.limit * 2)
+      const related = [...sameCategory]
+      for (const f of fillers) {
+        if (related.length >= data.limit) break
+        if (!exclude.has(f.id)) related.push(f)
+      }
+      return related
+    }),
   )

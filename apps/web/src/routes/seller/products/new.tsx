@@ -50,6 +50,14 @@ function NewProductPage() {
             categoryId: null,
             tagIds: [],
             status: "draft",
+            brand: "",
+            summary: "",
+            condition: "new",
+            weightGrams: "",
+            dimensions: { l: "", w: "", h: "" },
+            seoTitle: "",
+            seoDescription: "",
+            lowStockThreshold: "5",
           }}
           submitLabel="Create product"
           onSubmit={onSubmit}
