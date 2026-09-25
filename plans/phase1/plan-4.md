@@ -1,6 +1,6 @@
 # Plan 4 — Database, ORM, Migrations & Seeds
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-2 (workspaces), plan-3 (postgres running)
 **Estimated effort:** 1 day
 
@@ -95,3 +95,9 @@ Field names must match what the better-auth Drizzle adapter expects (copy the re
 ## Explicitly not in this plan
 
 Auth logic/flows (plan-5); any UI; triggers or advanced constraints beyond what is listed.
+
+---
+
+## As-built note (2026-09-25)
+
+Schema + migrations as planned (15 tables). Deltas: better-auth session field `impersonatedBy` added; better-auth tables are mapped explicitly (user/session/account/verification → our plural tables); seed lives at /scripts/seed.ts (root) to avoid a db↔auth workspace cycle and creates users through auth.api so password hashing matches.

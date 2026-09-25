@@ -579,7 +579,17 @@ async function loadOrderForAction(orderId: string, viewer: { id: string; role: s
       throw new AppError("FORBIDDEN", "This order does not contain your items")
     }
   }
-  return { order, shopIds }
+  const viewerShopId =
+    viewer.role === "seller"
+      ? shopIds.find(async (sid) => {
+          const [shop] = await db
+            .select({ ownerId: schema.shops.ownerId })
+            .from(schema.shops)
+            .where(eq(schema.shops.id, sid))
+          return shop?.ownerId === viewer.id
+        })
+      : undefined
+  return { order, shopIds, viewerShopId }
 }
 
 async function orderEmails(orderId: string, kind: "status" | "paid" | "cancelled", extra?: { status?: OrderStatus; reason?: string | null }) {
@@ -611,8 +621,8 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const { order, shopIds } = await loadOrderForAction(data.orderId, user)
-      const viewer = { id: user.id, role: user.role }
+      const { order, shopIds, viewerShopId } = await loadOrderForAction(data.orderId, user)
+      const viewer = { id: user.id, role: user.role, shopId: viewerShopId }
 
       if (data.status === "cancelled") {
         if (!canCancel({ status: order.status, buyerId: order.buyerId, shopIds }, viewer)) {
@@ -660,8 +670,14 @@ export const markOrderPaid = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const { order } = await loadOrderForAction(data.orderId, user)
-      if (!canMarkPaid(order.status, order.paymentStatus, { id: user.id, role: user.role })) {
+      const { order, viewerShopId } = await loadOrderForAction(data.orderId, user)
+      if (
+        !canMarkPaid(order.status, order.paymentStatus, {
+          id: user.id,
+          role: user.role,
+          shopId: viewerShopId,
+        })
+      ) {
         throw new AppError("INVALID", "Payment can be marked after delivery (cash collected by hand)")
       }
       await db

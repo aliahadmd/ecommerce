@@ -1,6 +1,6 @@
 # Plan 8 — Cart, Checkout & COD Orders
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-7 (products)
 **Estimated effort:** 2 days
 
@@ -92,3 +92,9 @@ Header cart badge (TanStack Store) updates from cart mutations.
 ## Explicitly not in this plan
 
 Online payments (the `payment_method` enum + `paymentStatus` machine is the seam where a gateway slots in later), per-seller sub-order splitting (simplification documented above), guest checkout, shipping-fee calculation rules (flat/env-configured fee, default 0).
+
+---
+
+## As-built note (2026-09-25)
+
+As planned: DB-backed cart, transactional checkout with atomic stock decrement (`stock >= qty` guard), COD lifecycle with permission matrix, cancellation with stock restore, and all five email flows — verified end-to-end in the browser (buyer order → seller confirm/ship/deliver/mark-paid, 6 emails in Mailpit, stock 200→199). Deltas: seller order detail is a dialog on the orders table rather than a separate page; guest carts and per-seller sub-orders remain deferred as noted.

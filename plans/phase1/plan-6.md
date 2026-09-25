@@ -1,6 +1,6 @@
 # Plan 6 — File Storage with SeaweedFS (S3)
 
-**Status:** Draft
+**Status:** Done (executed early, before the seed)
 **Depends on:** plan-3 (SeaweedFS running), plan-5 (auth guards)
 **Estimated effort:** 0.5–1 day
 
@@ -61,3 +61,9 @@ Multipart handling: TanStack Start server function receives `FormData`; file rea
 ## Explicitly not in this plan
 
 Image resizing/optimization pipeline (later phase), presigned direct uploads (later phase), category/tag images.
+
+---
+
+## As-built note (2026-09-25)
+
+Storage package as planned: S3 client with forcePathStyle, ensureBucket, ownership-encoded keys, server-proxied uploads, MIME/size/count validation, Redis rate limit. Presigner dep present for a future direct-upload flow.

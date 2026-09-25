@@ -1,6 +1,6 @@
 # Plan 7 — Catalog: Categories, Tags, Products + Storefront
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-4, plan-5, plan-6
 **Estimated effort:** 2–3 days
 
@@ -81,3 +81,9 @@ Rules: price/stock changes by a seller never touch existing orders (snapshots in
 ## Explicitly not in this plan
 
 Cart & checkout (plan-8), AI description generation hook (plan-10 adds a button to this form), product variants (later phase — schema note: variants would introduce `product_variants`; phase 1 products are single-SKU).
+
+---
+
+## As-built note (2026-09-25)
+
+As planned. Deltas: routes restructured into directories (products/, seller/products/, account/orders/) because a flat `products.tsx` acted as a layout without an Outlet and swallowed the detail route; createProduct is fields-only and images upload on the edit page; TanStack Table pinned to v8 (v9's new component API was too raw); drizzle-orm helpers are re-exported from @ecommerce/db (app does not depend on drizzle-orm directly — also sidesteps a pnpm 12 dangling-symlink bug); correlated SQL subqueries need hand-qualified columns ("products"."id") because drizzle renders them unqualified.

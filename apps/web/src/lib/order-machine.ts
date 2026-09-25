@@ -19,6 +19,8 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
 export type OrderViewer = {
   id: string
   role: "super_admin" | "seller" | "buyer"
+  /** Required for sellers: their shop's id (shopIds are shop ids, not user ids). */
+  shopId?: string
 }
 
 /** Who may cancel: buyer (own, pending/confirmed), seller (own-shop orders, same stages), admin (any order, same stages). */
@@ -29,7 +31,7 @@ export function canCancel(
   if (order.status !== "pending" && order.status !== "confirmed") return false
   if (viewer.role === "super_admin") return true
   if (viewer.role === "buyer") return order.buyerId === viewer.id
-  return order.shopIds.includes(viewer.id)
+  return viewer.shopId !== undefined && order.shopIds.includes(viewer.shopId)
 }
 
 /** Cash is collected on delivery; admin may reconcile manually at any live stage. */

@@ -1,6 +1,6 @@
 # Plan 10 — AI Features (AI SDK + OpenRouter)
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-7 (product form is the integration point)
 **Estimated effort:** 1 day
 
@@ -55,3 +55,9 @@ Default expectation: **deferred**, since the phase-1 stack already satisfies sea
 ## Explicitly not in this plan
 
 AI-generated images, chat/support bot, review summarization, embeddings-backed recommendations (phase 2+).
+
+---
+
+## As-built note (2026-09-25)
+
+packages/ai on ai@5 + @openrouter/ai-sdk-provider with generateObject structured outputs; server fns (generateDescription, suggestTags, aiStatus) with per-user Redis rate limits, a global daily cap, schema-validated outputs, and graceful AI_DISABLED when OPENROUTER_API_KEY is unset (UI hides the buttons). Deltas: streaming deferred (single-shot); pgvector semantic-search stretch deferred — OpenRouter does not serve embeddings (as anticipated in the plan). Actual generation was not exercised without a key; error paths verified.

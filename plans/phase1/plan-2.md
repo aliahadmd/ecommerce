@@ -1,6 +1,6 @@
 # Plan 2 — Monorepo Scaffold & Tooling
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-1 (approved)
 **Estimated effort:** half a day
 
@@ -127,3 +127,9 @@ Prerequisites (Docker Desktop, Node 22, pnpm via corepack), and the five-command
 ## Explicitly not in this plan
 
 Database schema (plan-4), any auth code (plan-5), docker compose file itself (plan-3 — but plan-2's Makefile already references it, so land plan-3's compose file in the same sitting or accept `make up` failing until then).
+
+---
+
+## As-built note (2026-09-25)
+
+As planned. Deltas: Node 24.21.0 via nvm (`.nvmrc` = 24); shadcn CLI 4.21 recognized `--pointer` (Base UI 'base-nova' preset) — the flag is real; packages consumed as TS source, no build step; root seed script lives in /scripts (see plan-4).

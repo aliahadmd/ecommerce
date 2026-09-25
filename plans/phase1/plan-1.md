@@ -1,6 +1,6 @@
 # Plan 1 — Phase 1 Overview & Architecture
 
-**Status:** Draft (approved by default unless changed)
+**Status:** Done (approved by default unless changed)
 **Depends on:** nothing — this is the map for plans 2–11
 **Date:** 2026-09-25
 
@@ -218,3 +218,9 @@ Plans 2 and 3 are independent and can run in parallel. Plans 9, 10, 11 are large
 ## 11. Future phases (preview, not committed)
 
 Phase 2+: reviews & ratings, coupons, semantic search with pgvector + embeddings, BullMQ workers on Redis (emails, exports), seller payouts/statements, multiple images galleries & video, wishlist, notifications center, i18n, online payments (gateway abstraction behind the existing `payment_method` field), organization/multi-staff shops via better-auth organization plugin.
+
+---
+
+## As-built note (2026-09-25)
+
+Implemented as planned. Deltas: Node 24 LTS (nvm v22 install on this machine was broken); eslint stays only in apps/web (template ships @tanstack/eslint-config) instead of a root eslint; charts use shadcn/Recharts (see plan-9).

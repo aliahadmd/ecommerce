@@ -1,6 +1,6 @@
 # Plan 3 — Docker Dev Environment
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-1
 **Estimated effort:** half a day
 
@@ -152,3 +152,9 @@ This proves the app is containerizable; it is **not** the day-to-day dev path. T
 ## Explicitly not in this plan
 
 Bucket creation & upload logic (plan-6), database schema (plan-4), production compose (plan-11 provides a `compose.prod.example.yml` shape for Dokploy mapping only).
+
+---
+
+## As-built note (2026-09-25)
+
+As planned with two SeaweedFS fixes discovered during verification: s3.json needs the nested `credentials` array (modern format) and an `anonymous` identity with Read for public image URLs; image pinned to chrislusf/seaweedfs:3.80.

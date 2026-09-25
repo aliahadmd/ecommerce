@@ -1,6 +1,6 @@
 # Plan 5 — Authentication, Authorization & RBAC
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-4 (schema), plan-3 (Mailpit running)
 **Estimated effort:** 1.5 days
 
@@ -97,3 +97,9 @@ Demo credentials for reviewers live in README (from seed: admin@dev.local, selle
 ## Explicitly not in this plan
 
 OAuth/social login, two-factor, organization plugin (phase 2+); user-management UI (plan-9).
+
+---
+
+## As-built note (2026-09-25)
+
+better-auth 1.7.5 with drizzle adapter, uuid ids, admin plugin (`defaultRole: buyer`, `adminRoles: [super_admin]` with access-control role definition). Deltas: email templates are plain HTML functions via nodemailer instead of react-email (fewer moving parts); TanStack Start server routes use `createFileRoute(...).server.handlers` (the createServerFileRoute API no longer exists); DropdownMenuLabel must be wrapped in DropdownMenuGroup for Base UI.

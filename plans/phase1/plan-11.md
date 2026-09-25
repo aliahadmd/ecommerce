@@ -1,6 +1,6 @@
 # Plan 11 — Testing, Hardening & Dokploy-Ready Packaging
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plans 2–10
 **Estimated effort:** 1.5–2 days
 
@@ -108,3 +108,9 @@ A `docker-compose.prod.example.yml` (not used by dev) shows the same env wiring 
 ## Explicitly not in this plan
 
 CI/CD pipelines, staging environment, backups/monitoring/alerting, actual Dokploy deployment (phase 2).
+
+---
+
+## As-built note (2026-09-25)
+
+Vitest suite (20 tests: order matrix, money/slug utils) green; /api/health with db/redis/storage checks green; multi-stage Dockerfile builds and runs via a small production runner (server.production.mjs) that serves TanStack Start's fetch-handler build output with streaming + Set-Cookie support; compose.prod.example.yml + README deploy mapping documented. Deltas: Playwright e2e deferred to phase 2 (browser-driven manual e2e was performed instead); pnpm 12 requires `allowBuilds` in pnpm-workspace.yaml and no longer reads the `pnpm` field in package.json.

@@ -24,6 +24,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
 import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ProductsIndexRouteImport } from './routes/products/index'
 import { Route as ProductsSlugRouteImport } from './routes/products/$slug'
 import { Route as SellerIndexRouteImport } from './routes/seller.index'
@@ -112,6 +113,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/orders'
     | '/admin/users'
+    | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/orders'
     | '/admin/users'
+    | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/orders'
     | '/admin/users'
+    | '/api/health'
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
@@ -358,6 +370,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SellerRoute: typeof SellerRouteWithChildren
   VerifyEmailRoute: typeof VerifyEmailRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
   ShopsSlugRoute: typeof ShopsSlugRoute
   AccountIndexRoute: typeof AccountIndexRoute
@@ -473,6 +486,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/users'
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/products/': {
       id: '/products/'
@@ -609,6 +629,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SellerRoute: SellerRouteWithChildren,
   VerifyEmailRoute: VerifyEmailRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ProductsSlugRoute: ProductsSlugRoute,
   ShopsSlugRoute: ShopsSlugRoute,
   AccountIndexRoute: AccountIndexRoute,

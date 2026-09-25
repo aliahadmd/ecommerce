@@ -1,6 +1,6 @@
 # Plan 9 — App Shell, Dashboards & Polish
 
-**Status:** Draft
+**Status:** Done
 **Depends on:** plan-5, plan-8 (works best after 7 too)
 **Estimated effort:** 1.5–2 days
 
@@ -68,3 +68,9 @@ Role-aware app shell, admin & seller dashboards with real charts, the user-manag
 ## Explicitly not in this plan
 
 Analytics/tracking, notifications center, i18n (phase 2+).
+
+---
+
+## As-built note (2026-09-25)
+
+Admin + seller dashboards with stat cards, 30-day orders/day charts, user management (role change, ban with reason, self-demotion/self-ban guards). Delta: charts use shadcn/Recharts — @tanstack/react-charts 0.18 is an alpha with a definition-based API and no docs; the plan authorized this fallback.

@@ -10,9 +10,11 @@
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx}\"",
     "check": "prettier --check \"**/*.{ts,tsx,js,jsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start": "node server.production.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1139.0",
     "@base-ui/react": "^1.8.0",
     "@ecommerce/ai": "workspace:*",
     "@ecommerce/auth": "workspace:*",
