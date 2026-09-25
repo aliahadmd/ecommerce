@@ -86,11 +86,13 @@ export function ProductForm({
   submitLabel,
   onSubmit,
   pending,
+  hidePriceStock = false,
 }: {
   defaultValues: ProductFormValues
   submitLabel: string
   onSubmit: (values: ProductFormValues) => void
   pending?: boolean
+  hidePriceStock?: boolean
 }) {
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -238,26 +240,28 @@ export function ProductForm({
         )}
       </form.Field>
 
-      <form.Field name="stock" validators={{ onChange: stockSchema }}>
-        {(field) => (
-          <div className="space-y-1.5">
-            <Label htmlFor="stock">Stock</Label>
-            <Input
-              id="stock"
-              type="number"
-              min={0}
-              value={field.state.value}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
-            {field.state.meta.errors.length > 0 && (
-              <p className="text-xs text-destructive">
-                {errMsg(field.state.meta.errors[0])}
-              </p>
-            )}
-          </div>
-        )}
-      </form.Field>
+      {!hidePriceStock && (
+        <form.Field name="stock" validators={{ onChange: stockSchema }}>
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="stock">Stock</Label>
+              <Input
+                id="stock"
+                type="number"
+                min={0}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-xs text-destructive">
+                  {errMsg(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+      )}
 
       <form.Field
         name="description"

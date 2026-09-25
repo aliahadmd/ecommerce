@@ -429,7 +429,33 @@ export const getProduct = createServerFn({ method: "GET" })
         .where(eq(schema.productAttributeValues.productId, row.product.id))
         .orderBy(asc(schema.attributeDefinitions.position))
 
-      return { ...row, images, tags, attributes }
+      // Variants (public: active only; owners/admins see all via listVariants)
+      const variants = await db
+        .select({
+          id: schema.productVariants.id,
+          sku: schema.productVariants.sku,
+          title: schema.productVariants.title,
+          priceCents: schema.productVariants.priceCents,
+          stock: schema.productVariants.stock,
+          imageId: schema.productVariants.imageId,
+          isDefault: schema.productVariants.isDefault,
+          options: sql<
+            { attributeId: string; value: string }[]
+          >`coalesce((
+            select json_agg(json_build_object('attributeId', vov.attribute_id, 'value', vov.value))
+            from variant_option_values vov where vov.variant_id = ${schema.productVariants.id}
+          ), '[]'::json)`,
+        })
+        .from(schema.productVariants)
+        .where(
+          and(
+            eq(schema.productVariants.productId, row.product.id),
+            eq(schema.productVariants.status, "active"),
+          ),
+        )
+        .orderBy(asc(schema.productVariants.position))
+
+      return { ...row, images, tags, attributes, variants }
     })
   )
 

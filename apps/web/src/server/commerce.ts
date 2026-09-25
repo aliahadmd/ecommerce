@@ -8,6 +8,7 @@ import {
   sendPaymentReceivedEmail,
 } from "@ecommerce/email"
 import type { OrderEmailItem } from "@ecommerce/email"
+import { recomputeProductAggregates } from "./variants"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { canCancel, canMarkPaid, canTransition } from "@/lib/order-machine"
 import type { OrderStatus } from "@/lib/order-machine"
@@ -28,16 +29,19 @@ async function ensureCart(userId: string) {
 const cartItemColumns = {
   itemId: schema.cartItems.id,
   productId: schema.products.id,
-  title: schema.products.title,
+  variantId: schema.cartItems.variantId,
+  // effective values: variant overrides product when present
+  title: sql<string>`concat(${schema.products.title}, case when ${schema.productVariants.title} is null then '' else concat(' — ', ${schema.productVariants.title}) end)`,
   slug: schema.products.slug,
-  priceCents: schema.products.priceCents,
+  priceCents: sql<number>`coalesce(${schema.productVariants.priceCents}, ${schema.products.priceCents})`,
   currency: schema.products.currency,
-  stock: schema.products.stock,
+  stock: sql<number>`coalesce(${schema.productVariants.stock}, ${schema.products.stock})`,
   quantity: schema.cartItems.quantity,
   imageUrl: sql<string | null>`(
-    select pi.url from product_images pi
-    where pi.product_id = ${schema.products.id}
-    order by pi.sort_order asc limit 1
+    select coalesce(
+      (select pi.url from product_images pi where pi.id = ${schema.productVariants.imageId}),
+      (select pi.url from product_images pi where pi.product_id = ${schema.products.id} order by pi.sort_order asc limit 1)
+    )
   )`,
   shopName: schema.shops.name,
   shopId: schema.shops.id,
@@ -410,30 +414,59 @@ export const placeOrder = createServerFn({ method: "POST" })
           }
         }
 
+        const variantProductIds = new Set<string>()
         for (const item of items) {
-          // Atomic stock check + decrement; row-level guard prevents oversell
-          const updated = await tx
-            .update(schema.products)
-            .set({ stock: sql`${schema.products.stock} - ${item.quantity}` })
-            .where(
-              and(
-                eq(schema.products.id, item.productId),
-                eq(schema.products.status, "active"),
-                gte(schema.products.stock, item.quantity)
+          if (item.variantId) {
+            // Variant-level decrement (same row-level oversell guard)
+            const updated = await tx
+              .update(schema.productVariants)
+              .set({ stock: sql`${schema.productVariants.stock} - ${item.quantity}` })
+              .where(
+                and(
+                  eq(schema.productVariants.id, item.variantId),
+                  eq(schema.productVariants.status, "active"),
+                  gte(schema.productVariants.stock, item.quantity)
+                )
               )
-            )
-            .returning({ id: schema.products.id })
-          if (updated.length === 0) {
-            throw new AppError(
-              "OUT_OF_STOCK",
-              `"${item.title}" only has ${item.stock} left — adjust your cart`
-            )
+              .returning({ id: schema.productVariants.id })
+            if (updated.length === 0) {
+              throw new AppError(
+                "OUT_OF_STOCK",
+                `"${item.title}" only has ${item.stock} left — adjust your cart`
+              )
+            }
+            const [prod] = await tx
+              .select({ productId: schema.productVariants.productId })
+              .from(schema.productVariants)
+              .where(eq(schema.productVariants.id, item.variantId))
+              .limit(1)
+            if (prod) variantProductIds.add(prod.productId)
+          } else {
+            // Legacy product-level decrement
+            const updated = await tx
+              .update(schema.products)
+              .set({ stock: sql`${schema.products.stock} - ${item.quantity}` })
+              .where(
+                and(
+                  eq(schema.products.id, item.productId),
+                  eq(schema.products.status, "active"),
+                  gte(schema.products.stock, item.quantity)
+                )
+              )
+              .returning({ id: schema.products.id })
+            if (updated.length === 0) {
+              throw new AppError(
+                "OUT_OF_STOCK",
+                `"${item.title}" only has ${item.stock} left — adjust your cart`
+              )
+            }
           }
           const totalCents = item.priceCents * item.quantity
           subtotalCents += totalCents
           orderItems.push({
             orderId: "",
             productId: item.productId,
+            variantId: item.variantId,
             shopId: item.shopId,
             title: item.title,
             slug: item.slug,
@@ -488,6 +521,10 @@ export const placeOrder = createServerFn({ method: "POST" })
         await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))
+        // keep product price/stock aggregates honest after variant stock moves
+        for (const pid of variantProductIds) {
+          await recomputeProductAggregates(tx, pid)
+        }
         return order
       })
 
@@ -825,15 +862,29 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
           const items = await tx
             .select({
               productId: schema.orderItems.productId,
+              variantId: schema.orderItems.variantId,
               quantity: schema.orderItems.quantity,
             })
             .from(schema.orderItems)
             .where(eq(schema.orderItems.orderId, order.id))
+          const variantProductIds = new Set<string>()
           for (const item of items) {
-            await tx
-              .update(schema.products)
-              .set({ stock: sql`${schema.products.stock} + ${item.quantity}` })
-              .where(eq(schema.products.id, item.productId))
+            if (item.variantId) {
+              // Variant-level restore + aggregate recompute
+              await tx
+                .update(schema.productVariants)
+                .set({ stock: sql`${schema.productVariants.stock} + ${item.quantity}` })
+                .where(eq(schema.productVariants.id, item.variantId))
+              variantProductIds.add(item.productId)
+            } else {
+              await tx
+                .update(schema.products)
+                .set({ stock: sql`${schema.products.stock} + ${item.quantity}` })
+                .where(eq(schema.products.id, item.productId))
+            }
+          }
+          for (const pid of variantProductIds) {
+            await recomputeProductAggregates(tx, pid)
           }
         })
         void orderEmails(order.id, "cancelled", { reason: data.reason })

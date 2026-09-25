@@ -16,6 +16,7 @@ import {
 import { users } from "./auth";
 import { products } from "./catalog";
 import { shops } from "./shops";
+import { productVariants } from "./variants";
 
 export const orderStatus = pgEnum("order_status", [
   "pending",
@@ -52,6 +53,9 @@ export const cartItems = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").references(() => productVariants.id, {
+      onDelete: "cascade",
+    }),
     quantity: integer("quantity").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -60,7 +64,11 @@ export const cartItems = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    uniqueIndex("cart_items_unique").on(t.cartId, t.productId),
+    uniqueIndex("cart_items_cart_variant_unique").on(
+      t.cartId,
+      t.productId,
+      t.variantId,
+    ),
     check("cart_items_quantity_check", sql`${t.quantity} > 0`),
   ],
 );
@@ -132,11 +140,15 @@ export const orderItems = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "restrict" }),
+    variantId: uuid("variant_id").references(() => productVariants.id, {
+      onDelete: "set null",
+    }),
     shopId: uuid("shop_id")
       .notNull()
       .references(() => shops.id, { onDelete: "restrict" }),
     // Product snapshot — survives product edits
     title: text("title").notNull(),
+    variantTitle: text("variant_title"),
     slug: text("slug").notNull(),
     imageUrl: text("image_url"),
     unitPriceCents: integer("unit_price_cents").notNull(),

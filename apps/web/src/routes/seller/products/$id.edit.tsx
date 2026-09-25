@@ -8,6 +8,7 @@ import { getProductForEdit, updateProduct } from "@/server/catalog"
 import { ProductForm } from "@/components/product-form"
 import type { ProductFormValues } from "@/components/product-form"
 import { ImageUploader } from "@/components/image-uploader"
+import { SellerVariants } from "@/components/seller-variants"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { unwrap } from "@/lib/unwrap"
@@ -57,6 +58,7 @@ function EditProductPage() {
   }
 
   const { product, images, tagIds, attributes } = data
+  const [variantCount, setVariantCount] = useState<number | null>(null)
 
   return (
     <Card className="mx-auto max-w-2xl">
@@ -68,7 +70,11 @@ function EditProductPage() {
           <h2 className="mb-2 text-sm font-medium">Images</h2>
           <ImageUploader productId={id} images={images} />
         </div>
+        <div className="border-t pt-4">
+          <SellerVariants productId={id} hasProductType={product.productTypeId !== null} onCountChange={setVariantCount} />
+        </div>
         <ProductForm
+          hidePriceStock={(variantCount ?? 0) > 0}
           defaultValues={{
             title: product.title,
             description: product.description,

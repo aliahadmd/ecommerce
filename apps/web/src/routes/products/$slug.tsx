@@ -7,6 +7,7 @@ import { addToCart } from "@/server/commerce"
 import { getProduct, listRelatedProducts } from "@/server/catalog"
 import { ProductCard } from "@/components/product-card"
 import { useWishlistSet, WishlistHeart } from "@/components/wishlist-heart"
+import { useVariantSelection, VariantSelectors } from "@/components/variant-selector"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
@@ -48,8 +49,14 @@ function ProductDetailPage() {
   const navigate = useNavigate()
   const [quantity, setQuantity] = useState(1)
   const add = useMutation({
-    mutationFn: (qty: number) =>
-      addToCart({ data: { productId: product.id, quantity: qty } }),
+    mutationFn: (input: { quantity: number; variantId?: string }) =>
+      addToCart({
+        data: {
+          productId: product.id,
+          quantity: input.quantity,
+          variantId: input.variantId,
+        },
+      }),
     onSuccess: (r) => {
       if (!r.ok) {
         // Send unauthenticated visitors to login instead of a dead-end toast
@@ -101,7 +108,23 @@ function ProductDetailPage() {
     )
   }
 
-  const { product, shop, images, tags, attributes, categoryName, categorySlug } = data
+  const {
+    product,
+    shop,
+    images,
+    tags,
+    attributes,
+    variants: productVariants,
+    categoryName,
+    categorySlug,
+  } = data
+  const {
+    axes,
+    chosen,
+    setChosen,
+    selected: selectedVariant,
+    isValueSelectable,
+  } = useVariantSelection(productVariants)
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -161,12 +184,20 @@ function ProductDetailPage() {
           )}
           <div className="mt-2 flex items-center gap-3">
             <span className="text-2xl font-bold">
-              {formatMoney(product.priceCents, product.currency)}
+              {formatMoney(
+                selectedVariant ? selectedVariant.priceCents : product.priceCents,
+                product.currency
+              )}
             </span>
-            {product.stock > 0 ? (
-              <Badge variant="secondary">{product.stock} in stock</Badge>
+            {(selectedVariant ? selectedVariant.stock : product.stock) > 0 ? (
+              <Badge variant="secondary">
+                {selectedVariant ? selectedVariant.stock : product.stock} in stock
+              </Badge>
             ) : (
               <Badge variant="destructive">Out of stock</Badge>
+            )}
+            {selectedVariant && (
+              <span className="text-muted-foreground text-xs">SKU {selectedVariant.sku}</span>
             )}
           </div>
 
@@ -188,6 +219,17 @@ function ProductDetailPage() {
                   <Badge variant="outline">{t.name}</Badge>
                 </Link>
               ))}
+            </div>
+          )}
+
+          {productVariants.length > 0 && (
+            <div className="mt-6">
+              <VariantSelectors
+                axes={axes}
+                chosen={chosen}
+                setChosen={setChosen}
+                isValueSelectable={isValueSelectable}
+              />
             </div>
           )}
 
@@ -219,8 +261,17 @@ function ProductDetailPage() {
               </Button>
             </div>
             <Button
-              disabled={product.stock === 0 || add.isPending}
-              onClick={() => add.mutate(quantity)}
+              disabled={
+                productVariants.length > 0
+                  ? !selectedVariant || selectedVariant.stock === 0 || add.isPending
+                  : product.stock === 0 || add.isPending
+              }
+              onClick={() =>
+                add.mutate({
+                  quantity,
+                  variantId: selectedVariant?.id,
+                })
+              }
             >
               Add to cart
             </Button>
