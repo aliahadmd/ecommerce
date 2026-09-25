@@ -5,7 +5,8 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { centsToDecimalString } from "@ecommerce/config"
 import { getProductForEdit, updateProduct } from "@/server/catalog"
-import { ProductForm, type ProductFormValues } from "@/components/product-form"
+import { ProductForm  } from "@/components/product-form"
+import type {ProductFormValues} from "@/components/product-form";
 import { ImageUploader } from "@/components/image-uploader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -32,7 +33,7 @@ function EditProductPage() {
     queryFn: () => getProductForEdit({ data: { id } }).then(unwrap),
   })
   if (isError) {
-    return <p className="text-destructive py-8">{(error as Error).message}</p>
+    return <p className="text-destructive py-8">{(error).message}</p>
   }
 
   async function onSubmit(values: ProductFormValues) {

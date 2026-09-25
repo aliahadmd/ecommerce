@@ -42,15 +42,21 @@ async function sendMail(options: {
   }
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  )
+}
+
 function layout(title: string, bodyHtml: string): string {
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f4f4f5;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#18181b">
     <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
       <div style="font-size:18px;font-weight:700;margin-bottom:16px">🛍️ Ecommerce</div>
-      <h1 style="font-size:20px;margin:0 0 16px">${title}</h1>
+      <h1 style="font-size:20px;margin:0 0 16px">${escapeHtml(title)}</h1>
       ${bodyHtml}
-      <p style="color:#71717a;font-size:12px;margin-top:32px">Sent by your local dev environment — view all mail at http://localhost:8025</p>
+      ${getEnv().NODE_ENV === "production" ? "" : '<p style="color:#71717a;font-size:12px;margin-top:32px">Sent by your local dev environment — view all mail at http://localhost:8025</p>'}
     </div>
   </body>
 </html>`
@@ -108,13 +114,13 @@ function itemsTable(data: OrderEmailData): string {
   const rows = data.items
     .map(
       (i) =>
-        `<tr><td style="padding:6px 0">${i.title} × ${i.quantity}</td><td style="text-align:right">${i.totalFormatted}</td></tr>`,
+        `<tr><td style="padding:6px 0">${escapeHtml(i.title)} × ${i.quantity}</td><td style="text-align:right">${escapeHtml(i.totalFormatted)}</td></tr>`,
     )
     .join("")
   return `<table style="width:100%;border-collapse:collapse;font-size:14px">${rows}
     <tr><td style="padding-top:8px;border-top:1px solid #e4e4e7"><strong>Total (cash on delivery)</strong></td>
     <td style="text-align:right;border-top:1px solid #e4e4e7"><strong>${data.totalFormatted}</strong></td></tr></table>
-    <p style="font-size:14px">Deliver to: ${data.shipAddress}</p>`
+    <p style="font-size:14px">Deliver to: ${escapeHtml(data.shipAddress)}</p>`
 }
 
 export async function sendOrderPlacedEmail(
@@ -142,7 +148,7 @@ export async function sendOrderStatusEmail(
     subject: `Order ${orderNumber} ${status}`,
     html: layout(
       `Order ${orderNumber} is now “${status}”`,
-      `<p>Your order status changed to <strong>${status}</strong>.</p>`,
+      `<p>Your order status changed to <strong>${escapeHtml(status)}</strong>.</p>`,
     ),
     text: `Order ${orderNumber} status: ${status}`,
   })
@@ -174,7 +180,7 @@ export async function sendOrderCancelledEmail(
     subject: `Order ${orderNumber} cancelled`,
     html: layout(
       `Order ${orderNumber} cancelled`,
-      `<p>Your order was cancelled${reason ? ` — reason: ${reason}` : ""}. Any reserved stock has been returned.</p>`,
+      `<p>Your order was cancelled${reason ? ` — reason: ${escapeHtml(reason)}` : ""}. Any reserved stock has been returned.</p>`,
     ),
     text: `Order ${orderNumber} cancelled${reason ? `: ${reason}` : ""}.`,
   })

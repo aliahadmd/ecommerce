@@ -22,6 +22,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { useState } from "react"
+
 export const Route = createFileRoute("/seller/orders")({
   loader: async ({ context: { queryClient } }) => {
     await queryClient.ensureQueryData({
@@ -77,8 +79,6 @@ function SellerOrdersPage() {
     </div>
   )
 }
-
-import { useState } from "react"
 
 function SellerOrderRow({
   order,

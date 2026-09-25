@@ -1,4 +1,4 @@
-import { schema } from "@ecommerce/db"
+import type { schema } from "@ecommerce/db"
 
 export type OrderStatus = (typeof schema.orderStatus.enumValues)[number]
 export type PaymentStatus = (typeof schema.paymentStatus.enumValues)[number]

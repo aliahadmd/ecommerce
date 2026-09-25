@@ -58,6 +58,49 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>
 
+/**
+ * In production these MUST be provided explicitly (no compiled-in defaults,
+ * and known dev defaults are refused). Guarding here means a misconfigured
+ * production container fails fast at boot with a readable error.
+ */
+const PROD_REQUIRED = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "S3_ENDPOINT",
+  "S3_PUBLIC_URL",
+  "S3_ACCESS_KEY",
+  "S3_SECRET_KEY",
+  "SMTP_HOST",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+] as const
+
+const PROD_FORBIDDEN_DEFAULTS: Partial<Record<(typeof PROD_REQUIRED)[number], string>> = {
+  BETTER_AUTH_SECRET: "dev-secret-change-me-0123456789abcdef0123456789abcdef",
+  S3_ACCESS_KEY: "ecommerce-dev",
+  S3_SECRET_KEY: "ecommerce-dev-secret",
+  DATABASE_URL: "postgres://ecommerce:ecommerce@localhost:5432/ecommerce",
+}
+
+function assertProductionEnv(): void {
+  const missing = PROD_REQUIRED.filter((key) => !process.env[key])
+  const problems: string[] = []
+  if (missing.length > 0) {
+    problems.push(`missing required variables:\n  - ${missing.join("\n  - ")}`)
+  }
+  const devDefaults = PROD_REQUIRED.filter(
+    (key) =>
+      process.env[key] !== undefined &&
+      process.env[key] === PROD_FORBIDDEN_DEFAULTS[key],
+  )
+  if (devDefaults.length > 0) {
+    problems.push(`dev defaults are not allowed in production:\n  - ${devDefaults.join("\n  - ")}`)
+  }
+  if (problems.length > 0) {
+    throw new Error(`Production environment misconfigured:\n${problems.join("\n")}`)
+  }
+}
+
 let cached: Env | null = null
 
 export function getEnv(): Env {
@@ -69,6 +112,7 @@ export function getEnv(): Env {
       .join("\n")
     throw new Error(`Invalid environment configuration:\n${details}`)
   }
+  if (result.data.NODE_ENV === "production") assertProductionEnv()
   cached = result.data
   return cached
 }

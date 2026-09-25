@@ -40,7 +40,7 @@ function ProductDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["cart"] })
       toast.success("Added to cart")
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => toast.error((e).message),
   })
 
   if (isError) {

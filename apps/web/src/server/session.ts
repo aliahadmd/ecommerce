@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start"
 import { getRequest } from "@tanstack/react-start/server"
 import { auth } from "@ecommerce/auth"
-import { ok, fail, type Result } from "@ecommerce/config"
+import { ok, fail  } from "@ecommerce/config"
+import type {Result} from "@ecommerce/config";
 
 export type Role = "super_admin" | "seller" | "buyer"
 

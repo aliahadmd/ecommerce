@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { authClient } from "@ecommerce/auth/client"
@@ -13,9 +14,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getCart } from "@/server/commerce"
 import { roleLabels } from "@/lib/role"
-import { useCartCount } from "@/lib/cart-store"
-import { getSession, type AppUser } from "@/server/session"
+import { setCartCount, useCartCount } from "@/lib/cart-store"
+import { getSession  } from "@/server/session"
+import type {AppUser} from "@/server/session";
 import { ShoppingBag, Search, LogOut, User, Store, Shield } from "lucide-react"
 
 /** Search + cart + role-aware account menu. Re-renders from root context. */
@@ -23,6 +26,19 @@ export function Header({ user }: { user: AppUser | null }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const cartCount = useCartCount()
+
+  // Keep the badge honest across reloads (the store starts at 0).
+  useEffect(() => {
+    if (!user) {
+      setCartCount(0)
+      return
+    }
+    getCart()
+      .then((r) => {
+        if (r.ok) setCartCount(r.data.count)
+      })
+      .catch(() => undefined)
+  }, [user])
 
   async function handleSignOut() {
     await authClient.signOut()

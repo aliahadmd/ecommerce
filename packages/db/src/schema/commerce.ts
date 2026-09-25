@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm"
 import {
+  bigint,
   boolean,
   char,
+  check,
   index,
   integer,
   pgEnum,
@@ -60,7 +63,10 @@ export const cartItems = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [uniqueIndex("cart_items_unique").on(t.cartId, t.productId)],
+  (t) => [
+    uniqueIndex("cart_items_unique").on(t.cartId, t.productId),
+    check("cart_items_quantity_check", sql`${t.quantity} > 0`),
+  ],
 )
 
 export const addresses = pgTable("addresses", {
@@ -151,5 +157,18 @@ export const orderItems = pgTable(
   (t) => [
     index("order_items_order_idx").on(t.orderId),
     index("order_items_shop_idx").on(t.shopId),
+    check("order_items_quantity_check", sql`${t.quantity} > 0`),
   ],
 )
+
+// better-auth database rate-limit storage (survives restarts, works across
+// instances) — enabled via `rateLimit.storage: "database"` in packages/auth.
+// better-auth reads/writes lastRequest as epoch milliseconds.
+export const rateLimits = pgTable("rate_limits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" })
+    .notNull()
+    .$defaultFn(() => Date.now()),
+})

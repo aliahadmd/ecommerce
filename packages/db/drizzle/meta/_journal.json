@@ -15,6 +15,27 @@
       "when": 1790330166902,
       "tag": "0001_robust_loa",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790346129765,
+      "tag": "0002_gigantic_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790346151659,
+      "tag": "0003_enable_extensions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790346272459,
+      "tag": "0004_ordinary_harrier",
+      "breakpoints": true
     }
   ]
 }

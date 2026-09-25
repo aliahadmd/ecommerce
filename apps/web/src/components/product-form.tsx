@@ -88,7 +88,7 @@ export function ProductForm({
       form.setFieldValue("description", r.data.description)
       toast.success("Description generated — review and edit")
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => toast.error((e).message),
   })
   const genTags = useMutation({
     mutationFn: (values: { title: string; description: string }) =>
@@ -101,7 +101,7 @@ export function ProductForm({
       setSuggestions(r.data.suggestions)
       if (r.data.suggestions.length === 0) toast.info("No tag suggestions")
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => toast.error((e).message),
   })
 
   const form = useForm({

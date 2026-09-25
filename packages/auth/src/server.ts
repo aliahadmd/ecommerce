@@ -16,7 +16,7 @@ const superAdminRole = ac.newRole({ ...adminAc.statements })
 
 export const auth = betterAuth({
   baseURL: getEnv().BETTER_AUTH_URL,
-  trustedOrigins: ["http://localhost:3000"],
+  trustedOrigins: [getEnv().BETTER_AUTH_URL],
   database: drizzleAdapter(db, {
     provider: "pg",
     // Our tables use plural names (plan-4); map better-auth's models explicitly.
@@ -25,6 +25,7 @@ export const auth = betterAuth({
       session: schema.sessions,
       account: schema.accounts,
       verification: schema.verifications,
+      rateLimit: schema.rateLimits,
     },
   }),
   advanced: {
@@ -56,6 +57,8 @@ export const auth = betterAuth({
     }),
   ],  rateLimit: {
     enabled: true,
+    // DB-backed: survives restarts and works across instances (audit fix)
+    storage: "database",
     window: 60,
     max: 20,
   },

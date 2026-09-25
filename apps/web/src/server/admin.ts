@@ -83,6 +83,14 @@ export const adminListUsers = createServerFn({ method: "GET" }).handler(() =>
   }),
 )
 
+/** Keep shops consistent with the owner's account state. */
+async function setShopStatusFor(ownerId: string, status: "active" | "suspended"): Promise<void> {
+  await db
+    .update(schema.shops)
+    .set({ status })
+    .where(eq(schema.shops.ownerId, ownerId))
+}
+
 export const adminSetUserRole = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const raw = input as { userId?: unknown; role?: unknown }
@@ -114,6 +122,10 @@ export const adminSetUserRole = createServerFn({ method: "POST" })
         .update(schema.users)
         .set({ role: data.role })
         .where(eq(schema.users.id, data.userId))
+      // Demoting a seller takes their shop off the storefront
+      if (data.role === "buyer") {
+        await setShopStatusFor(data.userId, "suspended")
+      }
       return { ok: true }
     }),
   )
@@ -146,6 +158,18 @@ export const adminSetUserBanned = createServerFn({ method: "POST" })
           banReason: data.banned ? data.reason : null,
         })
         .where(eq(schema.users.id, data.userId))
+      // A banned seller's shop must not keep taking orders; unban restores it
+      // only if they are still a seller.
+      if (data.banned) {
+        await setShopStatusFor(data.userId, "suspended")
+      } else {
+        const [user] = await db
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, data.userId))
+          .limit(1)
+        if (user?.role === "seller") await setShopStatusFor(data.userId, "active")
+      }
       return { ok: true }
     }),
   )

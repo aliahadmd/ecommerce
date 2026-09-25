@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useRouter  } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useRouter } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/verify-email")({
   validateSearch: z.object({ token: z.string().optional() }),

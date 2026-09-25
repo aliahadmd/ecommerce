@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
 import { db, schema, and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "@ecommerce/db"
-import { getRedis } from "@ecommerce/redis"
+import { cachedJson, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
@@ -9,13 +9,22 @@ const PAGE_SIZE = 12
 // ─── Public: categories & tags ───────────────────────────────────────────────
 
 export const getCategories = createServerFn({ method: "GET" }).handler(() =>
-  guard(async () => {
-    const rows = await db
-      .select()
-      .from(schema.categories)
-      .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name))
-    return rows
-  }),
+  guard(async () =>
+    // 60s cache (plan-7); timestamps excluded so the JSON round-trip stays honest
+    cachedJson("catalog:categories:v1", 60, async () =>
+      db
+        .select({
+          id: schema.categories.id,
+          name: schema.categories.name,
+          slug: schema.categories.slug,
+          parentId: schema.categories.parentId,
+          description: schema.categories.description,
+          sortOrder: schema.categories.sortOrder,
+        })
+        .from(schema.categories)
+        .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name)),
+    ),
+  ),
 )
 
 export const getTags = createServerFn({ method: "GET" }).handler(() =>
@@ -75,7 +84,7 @@ export const createCategory = createServerFn({ method: "POST" })
           parentId: data.parentId,
         })
         .returning()
-      await getRedis().del("catalog:categories:v1")
+      await invalidateCache("catalog:categories:v1")
       return row
     }),
   )
@@ -98,7 +107,7 @@ export const updateCategory = createServerFn({ method: "POST" })
         .where(eq(schema.categories.id, data.id))
         .returning()
       if (!row) throw new AppError("NOT_FOUND", "Category not found")
-      await getRedis().del("catalog:categories:v1")
+      await invalidateCache("catalog:categories:v1")
       return row
     }),
   )
@@ -120,7 +129,7 @@ export const deleteCategory = createServerFn({ method: "POST" })
         )
       }
       await db.delete(schema.categories).where(eq(schema.categories.id, data.id))
-      await getRedis().del("catalog:categories:v1")
+      await invalidateCache("catalog:categories:v1")
       return { deleted: true }
     }),
   )

@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-export const Route = createFileRoute("/seller/")({
-  component: SellerDashboard,
-})
-
 import { useQuery } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { getSellerStats } from "@/server/admin"
@@ -14,11 +10,16 @@ import { Button } from "@/components/ui/button"
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
+  ChartTooltipContent
+  
 } from "@/components/ui/chart"
+import type {ChartConfig} from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import { Package, Clock, HandCoins, DollarSign } from "lucide-react"
+
+export const Route = createFileRoute("/seller/")({
+  component: SellerDashboard,
+})
 
 const chartConfig = {
   count: { label: "Orders" },

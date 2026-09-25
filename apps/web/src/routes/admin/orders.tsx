@@ -76,7 +76,7 @@ function AdminOrdersPage() {
                 <TableCell>
                   <OrderActions
                     orderId={o.id}
-                    status={o.status as "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"}
+                    status={o.status}
                     paymentStatus={o.paymentStatus}
                     role="super_admin"
                   />

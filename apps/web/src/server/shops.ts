@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
-import { eq } from "@ecommerce/db"
+import { eq, db, schema  } from "@ecommerce/db"
 import { z } from "zod"
-import { db, schema } from "@ecommerce/db"
 import { slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireUser } from "./session"
 

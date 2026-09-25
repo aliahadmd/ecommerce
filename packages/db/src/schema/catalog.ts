@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import {
+  check,
   char,
   index,
   integer,
@@ -83,6 +84,8 @@ export const products = pgTable(
       "gin",
       sql`${t.title} gin_trgm_ops`,
     ),
+    check("products_price_cents_check", sql`${t.priceCents} >= 0`),
+    check("products_stock_check", sql`${t.stock} >= 0`),
   ],
 )
 

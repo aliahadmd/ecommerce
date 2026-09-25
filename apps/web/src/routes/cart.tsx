@@ -36,8 +36,10 @@ function CartPage() {
 
   const remove = useMutation({
     mutationFn: (itemId: string) => removeCartItem({ data: { itemId } }),
-    onSuccess: (r) => r.ok && afterMutation(0),
-    onError: (e) => toast.error((e as Error).message),
+    onSuccess: (r) => {
+      if (r.ok) afterMutation(r.data.count)
+    },
+    onError: (e) => toast.error((e).message),
   })
   const update = useMutation({
     mutationFn: (input: { itemId: string; quantity: number }) =>
@@ -49,7 +51,7 @@ function CartPage() {
       }
       if ("count" in r.data && typeof r.data.count === "number") afterMutation(r.data.count)
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => toast.error((e).message),
   })
 
   if (!cart) return null

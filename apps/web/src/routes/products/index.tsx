@@ -134,7 +134,7 @@ function ProductsPage() {
 
         <Select
           value={search.sort ?? "newest"}
-          onValueChange={(v) => patch({ sort: (v ?? "newest") as "newest" | "price-asc" | "price-desc", page: 1 })}
+          onValueChange={(v) => patch({ sort: (v ?? "newest"), page: 1 })}
         >
           <SelectTrigger className="w-36">
             <SelectValue />

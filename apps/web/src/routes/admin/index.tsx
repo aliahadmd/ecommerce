@@ -41,9 +41,10 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
+  ChartTooltipContent
+  
 } from "@/components/ui/chart"
+import type {ChartConfig} from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 import { Users, Store, Package, ShoppingCart, DollarSign, Ban } from "lucide-react"
 

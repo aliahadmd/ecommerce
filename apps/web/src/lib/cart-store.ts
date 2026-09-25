@@ -1,5 +1,4 @@
-import { useStore } from "@tanstack/react-store"
-import { createStore } from "@tanstack/react-store"
+import { useStore, createStore  } from "@tanstack/react-store"
 
 /** Global UI state kept deliberately tiny (plan-9 usage map). */
 export const cartStore = createStore({ count: 0 })

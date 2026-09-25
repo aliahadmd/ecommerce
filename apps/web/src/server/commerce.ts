@@ -17,9 +17,10 @@ import {
 import {
   canCancel,
   canMarkPaid,
-  canTransition,
-  type OrderStatus,
+  canTransition
+  
 } from "@/lib/order-machine"
+import type {OrderStatus} from "@/lib/order-machine";
 
 // ─── Cart ───────────────────────────────────────────────────────────────────
 
@@ -196,7 +197,8 @@ export const removeCartItem = cartItemTarget.handler(({ data }) =>
     const user = await requireUser()
     const item = await ownCartItem(user.id, data.itemId)
     await db.delete(schema.cartItems).where(eq(schema.cartItems.id, item.id))
-    return { removed: true }
+    const items = await loadCartItems(item.cartId)
+    return { removed: true, count: items.reduce((n, i) => n + i.quantity, 0) }
   }),
 )
 
@@ -303,6 +305,29 @@ export const placeOrder = createServerFn({ method: "POST" })
       const result = await db.transaction(async (tx) => {
         let subtotalCents = 0
         const orderItems: (typeof schema.orderItems.$inferInsert)[] = []
+
+        // Re-validate availability at purchase time: a product may have been
+        // archived, or its shop suspended, after the cart was filled.
+        const availability = await tx
+          .select({
+            productId: schema.products.id,
+            status: schema.products.status,
+            shopStatus: schema.shops.status,
+            shopName: schema.shops.name,
+          })
+          .from(schema.products)
+          .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+          .where(inArray(schema.products.id, items.map((i) => i.productId)))
+        const byProduct = new Map(availability.map((a) => [a.productId, a]))
+        for (const item of items) {
+          const a = byProduct.get(item.productId)
+          if (!a || a.status !== "active") {
+            throw new AppError("UNAVAILABLE", `"${item.title}" is no longer available — remove it from your cart`)
+          }
+          if (a.shopStatus !== "active") {
+            throw new AppError("UNAVAILABLE", `Shop "${a.shopName}" is currently unavailable — remove its items from your cart`)
+          }
+        }
 
         for (const item of items) {
           // Atomic stock check + decrement; row-level guard prevents oversell
@@ -573,22 +598,19 @@ async function loadOrderForAction(orderId: string, viewer: { id: string; role: s
     .from(schema.orderItems)
     .where(eq(schema.orderItems.orderId, orderId))
   const shopIds = [...new Set(items.map((i) => i.shopId))]
+
+  let viewerShopId: string | undefined
   if (viewer.role === "seller") {
-    const [shop] = await db.select({ id: schema.shops.id }).from(schema.shops).where(eq(schema.shops.ownerId, viewer.id)).limit(1)
+    const [shop] = await db
+      .select({ id: schema.shops.id })
+      .from(schema.shops)
+      .where(eq(schema.shops.ownerId, viewer.id))
+      .limit(1)
     if (!shop || !shopIds.includes(shop.id)) {
       throw new AppError("FORBIDDEN", "This order does not contain your items")
     }
+    viewerShopId = shop.id
   }
-  const viewerShopId =
-    viewer.role === "seller"
-      ? shopIds.find(async (sid) => {
-          const [shop] = await db
-            .select({ ownerId: schema.shops.ownerId })
-            .from(schema.shops)
-            .where(eq(schema.shops.id, sid))
-          return shop?.ownerId === viewer.id
-        })
-      : undefined
   return { order, shopIds, viewerShopId }
 }
 
