@@ -31,15 +31,20 @@ interface VariantRow {
 export function SellerVariants({
   productId,
   hasProductType,
+  onCountChange,
 }: {
   productId: string
   hasProductType: boolean
+  onCountChange?: (count: number) => void
 }) {
   const queryClient = useQueryClient()
   const { data: variants } = useQuery({
     queryKey: ["variants", productId],
     queryFn: () => listVariants({ data: { productId } }).then(unwrap),
   })
+  useEffect(() => {
+    if (variants) onCountChange?.(variants.length)
+  }, [variants, onCountChange])
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["variants", productId] })

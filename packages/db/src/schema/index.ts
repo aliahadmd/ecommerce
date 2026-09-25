@@ -3,4 +3,5 @@ export * from "./shops";
 export * from "./catalog";
 export * from "./commerce"
 export * from "./attributes"
-export * from "./variants";
+export * from "./variants"
+export * from "./reviews";

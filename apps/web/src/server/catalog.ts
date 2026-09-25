@@ -251,6 +251,8 @@ const productCardColumns = {
   shopSlug: schema.shops.slug,
   brand: schema.products.brand,
   condition: schema.products.condition,
+  ratingAvgX100: schema.products.ratingAvgX100,
+  ratingCount: schema.products.ratingCount,
   imageUrl: sql<string | null>`(
     select pi.url from product_images pi
     where pi.product_id = "products"."id"

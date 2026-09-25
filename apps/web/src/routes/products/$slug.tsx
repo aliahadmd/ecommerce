@@ -8,6 +8,7 @@ import { getProduct, listRelatedProducts } from "@/server/catalog"
 import { ProductCard } from "@/components/product-card"
 import { useWishlistSet, WishlistHeart } from "@/components/wishlist-heart"
 import { useVariantSelection, VariantSelectors } from "@/components/variant-selector"
+import { ProductReviews } from "@/components/product-reviews"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Badge } from "@/components/ui/badge"
@@ -303,6 +304,7 @@ function ProductDetailPage() {
         </div>
       </div>
 
+      <ProductReviews productId={product.id} />
       <RelatedProducts slug={slug} />
     </main>
   )

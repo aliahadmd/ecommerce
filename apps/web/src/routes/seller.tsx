@@ -38,6 +38,13 @@ function SellerLayout() {
         >
           Orders
         </Link>
+        <Link
+          to="/seller/reviews"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Reviews
+        </Link>
       </nav>
       <Outlet />
     </div>

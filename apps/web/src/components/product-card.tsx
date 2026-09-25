@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { formatMoney } from "@ecommerce/config"
 import { Badge } from "@/components/ui/badge"
 import { WishlistHeart } from "@/components/wishlist-heart"
+import { StarRating } from "@/components/star-rating"
 import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 
 export interface ProductCardData {
@@ -16,7 +17,7 @@ export interface ProductCardData {
   imageUrl: string | null
   brand?: string | null
   condition?: "new" | "used" | "refurbished"
-  ratingAvg?: number
+  ratingAvgX100?: number
   ratingCount?: number
 }
 
@@ -87,6 +88,12 @@ export function ProductCard({
           </Link>
         </div>
         <div className="flex items-center gap-1">
+          {product.ratingCount !== undefined && product.ratingCount > 0 && (
+            <span className="mr-1 flex items-center gap-0.5">
+              <StarRating value={(product.ratingAvgX100 ?? 0) / 100} className="size-3" />
+              <span className="text-muted-foreground text-[10px]">({product.ratingCount})</span>
+            </span>
+          )}
           {wishlist && (
             <WishlistHeart
               productId={product.id}

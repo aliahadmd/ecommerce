@@ -73,6 +73,9 @@ export const products = pgTable(
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+    /** average rating ×100 (0..500) — maintained by review writes */
+    ratingAvgX100: integer("rating_avg_x100").notNull().default(0),
+    ratingCount: integer("rating_count").notNull().default(0),
     /** Integer minor units (cents) — never floats. */
     priceCents: integer("price_cents").notNull(),
     currency: char("currency", { length: 3 }).notNull().default("USD"),
@@ -95,6 +98,8 @@ export const products = pgTable(
     check("products_stock_check", sql`${t.stock} >= 0`),
     check("products_weight_grams_check", sql`${t.weightGrams} >= 0`),
     check("products_low_stock_threshold_check", sql`${t.lowStockThreshold} >= 0`),
+    check("products_rating_avg_check", sql`${t.ratingAvgX100} BETWEEN 0 AND 500`),
+    check("products_rating_count_check", sql`${t.ratingCount} >= 0`),
   ],
 );
 
