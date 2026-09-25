@@ -7,6 +7,7 @@ export type { AttributeValue } from "./schema/attributes";
 export {
   eq,
   and,
+  notInArray,
   or,
   not,
   desc,

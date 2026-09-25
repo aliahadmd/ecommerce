@@ -380,6 +380,155 @@ async function main() {
     console.log(`  product ${def.slug} (${def.status ?? "active"})`);
   }
 
+  // ─── Phase 2: product types, attributes, variants, reviews, wishlist ──────
+  const { and, sql } = await import("@ecommerce/db")
+  const {
+    attributeDefinitions, productTypes, productAttributeValues, productVariants,
+    variantOptionValues, reviews, wishlistItems, orders, orderItems, users,
+    products: productsTable,
+  } = schema
+
+
+  await db.insert(productTypes).values({ name: "Apparel", slug: "apparel" }).onConflictDoNothing({ target: productTypes.slug })
+  await db.insert(productTypes).values({ name: "Drinkware", slug: "drinkware" }).onConflictDoNothing({ target: productTypes.slug })
+  const [apparelType] = await db.select().from(productTypes).where(eq(productTypes.slug, "apparel")).limit(1)
+  const [drinkwareType] = await db.select().from(productTypes).where(eq(productTypes.slug, "drinkware")).limit(1)
+
+  const attrDefs = [
+    { productTypeId: apparelType?.id ?? null, name: "Size", slug: "size", kind: "select" as const, options: ["S", "M", "L", "XL"], required: true, useForVariants: true, filterable: true, position: 0 },
+    { productTypeId: apparelType?.id ?? null, name: "Color", slug: "color", kind: "select" as const, options: ["Black", "White", "Olive"], required: true, useForVariants: true, filterable: true, position: 1 },
+    { productTypeId: apparelType?.id ?? null, name: "Material", slug: "material", kind: "select" as const, options: ["Cotton", "Merino", "Synthetic"], required: false, useForVariants: false, filterable: true, position: 2 },
+    { productTypeId: drinkwareType?.id ?? null, name: "Capacity", slug: "capacity", kind: "select" as const, options: ["350ml", "500ml", "750ml"], required: false, useForVariants: true, filterable: true, position: 0 },
+    { productTypeId: null, name: "Warranty months", slug: "warranty-months", kind: "number" as const, options: [], required: false, useForVariants: false, filterable: false, position: 0 },
+  ]
+  for (const def of attrDefs) {
+    await db.insert(attributeDefinitions).values(def).onConflictDoNothing()
+  }
+  const allDefs = await db.select().from(attributeDefinitions)
+  const defBySlug = new Map(allDefs.map((d) => [d.slug, d]))
+  const sizeDef = defBySlug.get("size")
+  const colorDef = defBySlug.get("color")
+  const capacityDef = defBySlug.get("capacity")
+  const materialDef = defBySlug.get("material")
+
+  const [beanie] = await db.select().from(productsTable).where(eq(productsTable.slug, "merino-wool-beanie")).limit(1)
+  const [bottle] = await db.select().from(productsTable).where(eq(productsTable.slug, "insulated-water-bottle-750ml")).limit(1)
+
+  async function ensureVariant(productId: string, sku: string, title: string, priceCents: number, stock: number, options: { attributeId: string; value: string }[], isDefault = false) {
+    const [existing] = await db.select().from(productVariants).where(eq(productVariants.sku, sku)).limit(1)
+    if (existing) return existing
+    const [variant] = await db.insert(productVariants).values({
+      productId, sku, title, priceCents, stock, isDefault, status: "active",
+    }).returning()
+    if (options.length > 0) {
+      await db.insert(variantOptionValues).values(options.map((o) => ({ variantId: variant.id, attributeId: o.attributeId, value: o.value })))
+    }
+    return variant
+  }
+
+  if (beanie && sizeDef && colorDef) {
+    await db.update(productsTable).set({ productTypeId: apparelType?.id ?? null }).where(eq(productsTable.id, beanie.id))
+    // drop the bare "Default" variant left by migration 0009 (no option values)
+    await db.execute(sql`
+      DELETE FROM product_variants v
+      WHERE v.product_id = ${beanie.id}
+        AND NOT EXISTS (SELECT 1 FROM variant_option_values o WHERE o.variant_id = v.id)
+    `)
+    let n = 0
+    for (const size of ["S", "M", "L"]) {
+      for (const color of ["Black", "Olive"]) {
+        await ensureVariant(beanie.id, `BEANIE-${size}-${color.toUpperCase()}`, `${size} / ${color}`, beanie.priceCents + n * 100, 10 + n, [
+          { attributeId: sizeDef.id, value: size },
+          { attributeId: colorDef.id, value: color },
+        ], n === 0)
+        n++
+      }
+    }
+    if (materialDef) {
+      await db.insert(productAttributeValues).values({ productId: beanie.id, attributeId: materialDef.id, value: "Merino" }).onConflictDoNothing()
+    }
+    const vs = await db.select().from(productVariants).where(eq(productVariants.productId, beanie.id))
+    await db.update(productsTable).set({ priceCents: Math.min(...vs.map((v) => v.priceCents)), stock: vs.reduce((s2, v) => s2 + v.stock, 0) }).where(eq(productsTable.id, beanie.id))
+    console.log("  variants for merino-wool-beanie")
+  }
+
+  if (bottle && capacityDef) {
+    await db.update(productsTable).set({ productTypeId: drinkwareType?.id ?? null }).where(eq(productsTable.id, bottle.id))
+    await db.execute(sql`
+      DELETE FROM product_variants v
+      WHERE v.product_id = ${bottle.id}
+        AND NOT EXISTS (SELECT 1 FROM variant_option_values o WHERE o.variant_id = v.id)
+    `)
+    await ensureVariant(bottle.id, "BOTTLE-350", "350ml", 2000, 40, [{ attributeId: capacityDef.id, value: "350ml" }], false)
+    await ensureVariant(bottle.id, "BOTTLE-500", "500ml", 2200, 60, [{ attributeId: capacityDef.id, value: "500ml" }], false)
+    await ensureVariant(bottle.id, "BOTTLE-750", "750ml", bottle.priceCents, bottle.stock, [{ attributeId: capacityDef.id, value: "750ml" }], true)
+    console.log("  variants for insulated-water-bottle-750ml")
+  }
+
+  const [existingSeedOrder] = await db.select().from(orders).where(eq(orders.orderNumber, "ORD-SEED-0001")).limit(1)
+  let orderItemId: string | null = null
+  if (existingSeedOrder) {
+    const [item] = await db.select().from(orderItems).where(eq(orderItems.orderId, existingSeedOrder.id)).limit(1)
+    orderItemId = item?.id ?? null
+  } else if (buyer && bottle) {
+    const [order] = await db.insert(orders).values({
+      orderNumber: "ORD-SEED-0001",
+      buyerId: buyer.id,
+      status: "delivered",
+      paymentMethod: "cod",
+      paymentStatus: "paid",
+      subtotalCents: bottle.priceCents,
+      shippingFeeCents: 0,
+      totalCents: bottle.priceCents,
+      currency: "USD",
+      shipName: "Bob Buyer", shipPhone: "+1-555-0100",
+      shipLine1: "42 Market Street", shipCity: "San Francisco", shipCountry: "US",
+    }).returning()
+    const [item] = await db.insert(orderItems).values({
+      orderId: order.id, productId: bottle.id, shopId: shop.id,
+      title: bottle.title, slug: bottle.slug,
+      unitPriceCents: bottle.priceCents, quantity: 1, totalCents: bottle.priceCents,
+    }).returning()
+    orderItemId = item.id
+    console.log("  seed order ORD-SEED-0001 (delivered & paid)")
+  }
+
+  const reviewDefs = [
+    { productSlug: "insulated-water-bottle-750ml", email: "buyer@dev.local", rating: 5, title: "Keeps cold all day", body: "Filled it at 7am and still had ice at dinner. The flip cap never leaks in my bag." },
+    { productSlug: "wireless-mechanical-keyboard", email: "buyer@dev.local", rating: 4, title: "Great thock, minor quibbles", body: "Typing feel is excellent and the wireless is solid. The keycaps could be denser for the price." },
+    { productSlug: "merino-wool-beanie", email: "buyer@dev.local", rating: 5, title: "Itch-free and warm", body: "Wore it all winter with zero itch. Holds shape after washing." },
+  ]
+  for (const def of reviewDefs) {
+    const [product] = await db.select().from(productsTable).where(eq(productsTable.slug, def.productSlug)).limit(1)
+    const [user] = await db.select().from(users).where(eq(users.email, def.email)).limit(1)
+    if (!product || !user) continue
+    const [existing] = await db.select().from(reviews).where(and(eq(reviews.productId, product.id), eq(reviews.userId, user.id))).limit(1)
+    if (existing) continue
+    await db.insert(reviews).values({
+      productId: product.id, userId: user.id, orderItemId,
+      rating: def.rating, title: def.title, body: def.body,
+    }).onConflictDoNothing()
+  }
+  const ratedProducts = await db.select().from(productsTable)
+  for (const p of ratedProducts) {
+    const agg = await db.select({
+      count: sql<number>`count(*)::int`,
+      avg: sql<number | null>`avg(${reviews.rating})`,
+    }).from(reviews).where(and(eq(reviews.productId, p.id), eq(reviews.status, "approved")))
+    const c = agg[0]?.count ?? 0
+    await db.update(productsTable).set({
+      ratingCount: c,
+      ratingAvgX100: agg[0]?.avg ? Math.round(Number(agg[0].avg) * 100) : 0,
+    }).where(eq(productsTable.id, p.id))
+  }
+  console.log("  reviews + rating aggregates")
+
+  const [kb] = await db.select().from(productsTable).where(eq(productsTable.slug, "wireless-mechanical-keyboard")).limit(1)
+  if (buyer && kb) {
+    await db.insert(wishlistItems).values({ userId: buyer.id, productId: kb.id }).onConflictDoNothing()
+    console.log("  wishlist item for buyer")
+  }
+
   console.log("Seed complete.");
   console.log(`  super admin : ${env.SUPER_ADMIN_EMAIL} / ${env.SUPER_ADMIN_PASSWORD}`);
   console.log("  seller      : seller@dev.local / Seller1234!");

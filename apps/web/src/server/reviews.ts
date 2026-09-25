@@ -2,35 +2,10 @@ import { createServerFn } from "@tanstack/react-start"
 
 import { z } from "zod"
 import { db, schema, and, desc, eq, inArray, sql } from "@ecommerce/db"
+import { recomputeProductRating } from "./internals"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
 const EDIT_WINDOW_DAYS = 30
-
-/** Recompute products.rating_avg_x100 / rating_count over approved reviews. */
-export async function recomputeProductRating(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  productId: string,
-): Promise<void> {
-  const [agg] = await tx
-    .select({
-      count: sql<number>`count(*)::int`,
-      avg: sql<number | null>`avg(${schema.reviews.rating})`,
-    })
-    .from(schema.reviews)
-    .where(
-      and(
-        eq(schema.reviews.productId, productId),
-        eq(schema.reviews.status, "approved"),
-      ),
-    )
-  await tx
-    .update(schema.products)
-    .set({
-      ratingCount: agg?.count ?? 0,
-      ratingAvgX100: agg?.avg ? Math.round(Number(agg.avg) * 100) : 0,
-    })
-    .where(eq(schema.products.id, productId))
-}
 
 /** Verified purchase = user bought this product in a paid/delivered order. */
 async function findVerifiedOrderItem(userId: string, productId: string) {

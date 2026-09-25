@@ -43,7 +43,11 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
-      await sendVerificationEmail(user.email, url);
+      // Send the user to the app page after verification (better-auth returns
+      // JSON on direct navigation without a callbackURL).
+      const stripped = url.replace(/([?&])callbackURL=[^&]*/g, "$1")
+      const withCallback = `${stripped}${stripped.includes("?") ? "&" : "?"}callbackURL=${encodeURIComponent("/verify-email")}`;
+      await sendVerificationEmail(user.email, withCallback);
     },
   },
   plugins: [

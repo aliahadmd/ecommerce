@@ -78,7 +78,7 @@ export const uploadProductImage = createServerFn({ method: "POST" })
       }
 
       const key = buildImageKey(target.shopId, productId, file.type)
-      await uploadImage(key, Buffer.from(await file.arrayBuffer()), file.type)
+      await uploadImage(key, new Uint8Array(await file.arrayBuffer()), file.type)
       const [image] = await db
         .insert(schema.productImages)
         .values({

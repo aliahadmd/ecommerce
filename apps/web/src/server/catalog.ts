@@ -13,7 +13,7 @@ import {
   or,
   sql,
 } from "@ecommerce/db"
-import { cachedJson, getRedis, invalidateCache } from "@ecommerce/redis"
+import { cachedJson, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { validateAttributeValue } from "./attributes"
@@ -1295,7 +1295,7 @@ export const reorderCategories = createServerFn({ method: "POST" })
             .where(eq(schema.categories.id, id))
         }
       })
-      await getRedis().del("catalog:categories:v1").catch(() => undefined)
+      await invalidateCache("catalog:categories:v1")
       return { ok: true }
     }),
   )

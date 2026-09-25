@@ -8,7 +8,7 @@ import {
   sendPaymentReceivedEmail,
 } from "@ecommerce/email"
 import type { OrderEmailItem } from "@ecommerce/email"
-import { recomputeProductAggregates } from "./variants"
+import { recomputeProductAggregates } from "./internals"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { canCancel, canMarkPaid, canTransition } from "@/lib/order-machine"
 import type { OrderStatus } from "@/lib/order-machine"
@@ -57,6 +57,7 @@ async function loadCartItems(cartId: string) {
       eq(schema.cartItems.productId, schema.products.id)
     )
     .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
+    .leftJoin(schema.productVariants, eq(schema.cartItems.variantId, schema.productVariants.id))
     .where(eq(schema.cartItems.cartId, cartId))
     .orderBy(desc(schema.cartItems.createdAt))
 }
@@ -80,19 +81,25 @@ export const getCart = createServerFn({ method: "GET" }).handler(() =>
 
 const cartTarget = createServerFn({ method: "POST" }).validator(
   (input: unknown) => {
-    const raw = input as { productId?: unknown; quantity?: unknown }
+    const raw = input as {
+      productId?: unknown
+      variantId?: unknown
+      quantity?: unknown
+    }
     const productId = String(raw.productId ?? "")
+    const variantId = raw.variantId ? String(raw.variantId) : null
     const quantity = Number(raw.quantity ?? 1)
     if (!productId) throw new AppError("INVALID", "productId required")
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
       throw new AppError("INVALID", "Quantity must be 1–999")
     }
-    return { productId, quantity }
+    return { productId, variantId, quantity }
   }
 )
 
 export const addToCart = cartTarget.handler(({ data }) =>
   guard(async () => {
+    console.log('[addToCart] handler data:', JSON.stringify(data))
     const user = await requireUser()
     const [product] = await db
       .select({
@@ -143,6 +150,7 @@ export const addToCart = cartTarget.handler(({ data }) =>
         .values({
           cartId: cart.id,
           productId: product.id,
+          variantId: data.variantId,
           quantity: data.quantity,
         })
     }

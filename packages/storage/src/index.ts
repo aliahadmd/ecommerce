@@ -73,7 +73,7 @@ export function buildImageKey(shopId: string, productId: string, mime: string): 
 
 export async function uploadImage(
   key: string,
-  body: Buffer | Uint8Array,
+  body: Uint8Array,
   contentType: string,
 ): Promise<void> {
   await getS3().send(

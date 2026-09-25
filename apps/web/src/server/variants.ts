@@ -1,41 +1,24 @@
 import { createServerFn } from "@tanstack/react-start"
 
 import { z } from "zod"
-import { db, schema, and, asc, eq, inArray, sql  } from "@ecommerce/db"
-import type {Tx} from "@ecommerce/db";
+import { db, schema, and, asc, eq, sql } from "@ecommerce/db"
+import { recomputeProductAggregates } from "./internals"
 import { AppError, guard, requireRole, requireUser } from "./session"
-import { isUniqueViolation } from "./catalog"
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "23505"
+  )
+}
 
 /**
  * Plan-5: variants are the source of truth for price/stock once a product
  * has them; products.price_cents/stock become derived aggregates maintained
  * in the same transaction as every variant write.
  */
-export async function recomputeProductAggregates(
-  tx: Tx,
-  productId: string,
-): Promise<void> {
-  const [agg] = await tx
-    .select({
-      minPrice: sql<number | null>`min(${schema.productVariants.priceCents})`,
-      totalStock: sql<number>`coalesce(sum(${schema.productVariants.stock}), 0)::int`,
-    })
-    .from(schema.productVariants)
-    .where(
-      and(
-        eq(schema.productVariants.productId, productId),
-        inArray(schema.productVariants.status, ["active", "draft"]),
-      ),
-    )
-  await tx
-    .update(schema.products)
-    .set({
-      priceCents: agg?.minPrice ?? 0,
-      stock: agg?.totalStock ?? 0,
-    })
-    .where(eq(schema.products.id, productId))
-}
-
 /** Product + ownership load shared by the mutations. */
 async function productWithOwner(productId: string) {
   const [row] = await db

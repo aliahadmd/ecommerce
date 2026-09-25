@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getCart } from "@/server/commerce"
+import { getCart } from "@/lib/cart-rpc"
 import { roleLabels } from "@/lib/role"
 import { setCartCount, useCartCount } from "@/lib/cart-store"
 import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
