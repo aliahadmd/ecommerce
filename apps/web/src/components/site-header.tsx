@@ -18,8 +18,8 @@ import { getCart } from "@/server/commerce"
 import { roleLabels } from "@/lib/role"
 import { setCartCount, useCartCount } from "@/lib/cart-store"
 import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
-import { getSession  } from "@/server/session"
-import type {AppUser} from "@/server/session";
+import { getSession } from "@/server/session"
+import type { AppUser } from "@/server/session"
 import { ShoppingBag, Search, LogOut, User, Store, Shield } from "lucide-react"
 
 /** Search + cart + role-aware account menu. Re-renders from root context. */
@@ -60,15 +60,15 @@ export function Header({ user }: { user: AppUser | null }) {
   }
 
   return (
-    <header className="bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 border-b backdrop-blur">
+    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
         <Link to="/" className="flex items-center gap-2 font-semibold">
           <ShoppingBag className="size-5" />
           <span>Ecommerce</span>
         </Link>
 
-        <form onSubmit={handleSearch} className="relative ml-2 flex-1 max-w-md">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+        <form onSubmit={handleSearch} className="relative ml-2 max-w-md flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             name="q"
             placeholder="Search products…"
@@ -87,7 +87,7 @@ export function Header({ user }: { user: AppUser | null }) {
           >
             <ShoppingBag className="size-5" />
             {cartCount > 0 && (
-              <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-bold">
+              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                 {cartCount}
               </span>
             )}
@@ -114,7 +114,7 @@ export function Header({ user }: { user: AppUser | null }) {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>
                     <div className="truncate">{user.email}</div>
-                    <div className="text-muted-foreground text-xs font-normal">
+                    <div className="text-xs font-normal text-muted-foreground">
                       {roleLabels[user.role]}
                     </div>
                   </DropdownMenuLabel>
@@ -123,7 +123,9 @@ export function Header({ user }: { user: AppUser | null }) {
                 <DropdownMenuItem render={<Link to="/account" />}>
                   <User className="size-4" /> My account
                 </DropdownMenuItem>
-                <DropdownMenuItem render={<Link to="/account/orders" search={{}} />}>
+                <DropdownMenuItem
+                  render={<Link to="/account/orders" search={{}} />}
+                >
                   <ShoppingBag className="size-4" /> My orders
                 </DropdownMenuItem>
                 {user.role !== "buyer" && (

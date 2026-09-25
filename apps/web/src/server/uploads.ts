@@ -31,7 +31,7 @@ async function productWithOwner(productId: string) {
 
 function assertCanManage(
   user: { id: string; role: string },
-  ownerId: string,
+  ownerId: string
 ): void {
   if (user.role !== "super_admin" && user.id !== ownerId) {
     throw new AppError("FORBIDDEN", "You can only manage your own products")
@@ -54,7 +54,10 @@ export const uploadProductImage = createServerFn({ method: "POST" })
         throw new AppError("INVALID", "No file provided")
       }
       if (!isAllowedImageMime(file.type)) {
-        throw new AppError("INVALID", "Only JPEG, PNG or WebP images are allowed")
+        throw new AppError(
+          "INVALID",
+          "Only JPEG, PNG or WebP images are allowed"
+        )
       }
       if (file.size > MAX_IMAGE_BYTES) {
         throw new AppError("INVALID", "Image must be 5MB or smaller")
@@ -65,12 +68,12 @@ export const uploadProductImage = createServerFn({ method: "POST" })
 
       const count = await db.$count(
         schema.productImages,
-        eq(schema.productImages.productId, productId),
+        eq(schema.productImages.productId, productId)
       )
       if (count >= MAX_IMAGES_PER_PRODUCT) {
         throw new AppError(
           "INVALID",
-          `Max ${MAX_IMAGES_PER_PRODUCT} images per product`,
+          `Max ${MAX_IMAGES_PER_PRODUCT} images per product`
         )
       }
 
@@ -87,8 +90,8 @@ export const uploadProductImage = createServerFn({ method: "POST" })
         })
         .returning()
       return { id: image.id, url: image.url }
-    }),
-)
+    })
+  )
 
 export const deleteProductImage = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
@@ -109,7 +112,7 @@ export const deleteProductImage = createServerFn({ method: "POST" })
         .from(schema.productImages)
         .innerJoin(
           schema.products,
-          eq(schema.productImages.productId, schema.products.id),
+          eq(schema.productImages.productId, schema.products.id)
         )
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
         .where(eq(schema.productImages.id, data.imageId))
@@ -121,7 +124,7 @@ export const deleteProductImage = createServerFn({ method: "POST" })
         .where(eq(schema.productImages.id, data.imageId))
       await deleteObject(image.key).catch(() => undefined)
       return { deleted: true }
-    }),
+    })
   )
 
 export const setPrimaryImage = createServerFn({ method: "POST" })
@@ -156,5 +159,5 @@ export const setPrimaryImage = createServerFn({ method: "POST" })
           .where(eq(schema.productImages.id, id))
       }
       return { ok: true }
-    }),
+    })
   )

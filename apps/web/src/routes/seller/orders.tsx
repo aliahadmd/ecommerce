@@ -68,7 +68,10 @@ function SellerOrdersPage() {
             ))}
             {orders?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-12 text-center">
+                <TableCell
+                  colSpan={6}
+                  className="py-12 text-center text-muted-foreground"
+                >
                   No orders containing your products yet.
                 </TableCell>
               </TableRow>
@@ -104,10 +107,13 @@ function SellerOrderRow({
   return (
     <TableRow>
       <TableCell>
-        <button className="font-medium hover:underline" onClick={() => setOpen(true)}>
+        <button
+          className="font-medium hover:underline"
+          onClick={() => setOpen(true)}
+        >
           {order.orderNumber}
         </button>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           {new Date(order.createdAt).toLocaleString()}
         </p>
       </TableCell>
@@ -120,7 +126,9 @@ function SellerOrderRow({
           {order.paymentStatus}
         </Badge>
       </TableCell>
-      <TableCell className="text-right">{formatMoney(order.totalCents, order.currency)}</TableCell>
+      <TableCell className="text-right">
+        {formatMoney(order.totalCents, order.currency)}
+      </TableCell>
       <TableCell>
         <OrderActions
           orderId={order.id}
@@ -141,12 +149,15 @@ function SellerOrderRow({
                       <span>
                         {i.title} × {i.quantity}
                       </span>
-                      <span>{formatMoney(i.totalCents, detail.order.currency)}</span>
+                      <span>
+                        {formatMoney(i.totalCents, detail.order.currency)}
+                      </span>
                     </div>
                   ))}
-                  <p className="text-muted-foreground pt-2">
-                    Deliver to: {detail.order.shipName}, {detail.order.shipLine1},{" "}
-                    {detail.order.shipCity} · {detail.order.shipPhone}
+                  <p className="pt-2 text-muted-foreground">
+                    Deliver to: {detail.order.shipName},{" "}
+                    {detail.order.shipLine1}, {detail.order.shipCity} ·{" "}
+                    {detail.order.shipPhone}
                   </p>
                 </CardContent>
               </Card>

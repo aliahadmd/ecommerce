@@ -1,9 +1,19 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { toast } from "sonner"
 import { formatMoney } from "@ecommerce/config"
-import { createAddress, getCart, listAddresses, placeOrder } from "@/server/commerce"
+import {
+  createAddress,
+  getCart,
+  listAddresses,
+  placeOrder,
+} from "@/server/commerce"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Button } from "@/components/ui/button"
@@ -19,8 +29,14 @@ export const Route = createFileRoute("/checkout")({
     }
   },
   loader: async ({ context: { queryClient } }) => {
-    await queryClient.ensureQueryData({ queryKey: ["cart"], queryFn: () => getCart().then(unwrap) })
-    await queryClient.ensureQueryData({ queryKey: ["addresses"], queryFn: () => listAddresses().then(unwrap) })
+    await queryClient.ensureQueryData({
+      queryKey: ["cart"],
+      queryFn: () => getCart().then(unwrap),
+    })
+    await queryClient.ensureQueryData({
+      queryKey: ["addresses"],
+      queryFn: () => listAddresses().then(unwrap),
+    })
   },
   component: CheckoutPage,
 })
@@ -32,13 +48,20 @@ function CheckoutPage() {
   const [showNew, setShowNew] = useState(false)
   const [placing, setPlacing] = useState(false)
 
-  const { data: cart } = useQuery({ queryKey: ["cart"], queryFn: () => getCart().then(unwrap) })
+  const { data: cart } = useQuery({
+    queryKey: ["cart"],
+    queryFn: () => getCart().then(unwrap),
+  })
   const { data: addresses } = useQuery({
     queryKey: ["addresses"],
     queryFn: () => listAddresses().then(unwrap),
   })
 
-  const chosen = selected ?? addresses?.find((a) => a.isDefault)?.id ?? addresses?.[0]?.id ?? null
+  const chosen =
+    selected ??
+    addresses?.find((a) => a.isDefault)?.id ??
+    addresses?.[0]?.id ??
+    null
 
   const addAddress = useMutation({
     mutationFn: (form: FormData) => {
@@ -84,8 +107,14 @@ function CheckoutPage() {
     setCartCount(0)
     void queryClient.invalidateQueries({ queryKey: ["cart"] })
     void queryClient.invalidateQueries({ queryKey: ["addresses"] })
-    toast.success(`Order ${result.data.orderNumber} placed — pay cash on delivery`)
-    await navigate({ to: "/account/orders/$id", params: { id: result.data.id }, search: {} })
+    toast.success(
+      `Order ${result.data.orderNumber} placed — pay cash on delivery`
+    )
+    await navigate({
+      to: "/account/orders/$id",
+      params: { id: result.data.id },
+      search: {},
+    })
   }
 
   if (!cart || !addresses) return null
@@ -94,7 +123,11 @@ function CheckoutPage() {
     return (
       <main className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-xl font-semibold">Your cart is empty</h1>
-        <Button render={<Link to="/products" search={{}} />} variant="outline" className="mt-4">
+        <Button
+          render={<Link to="/products" search={{}} />}
+          variant="outline"
+          className="mt-4"
+        >
           Browse products
         </Button>
       </main>
@@ -113,19 +146,30 @@ function CheckoutPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {addresses.length > 0 && !showNew && (
-              <RadioGroup value={chosen ?? undefined} onValueChange={(v) => setSelected(v ?? null)}>
+              <RadioGroup
+                value={chosen ?? undefined}
+                onValueChange={(v) => setSelected(v ?? null)}
+              >
                 {addresses.map((a) => (
-                  <label key={a.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+                  <label
+                    key={a.id}
+                    className="flex items-start gap-3 rounded-lg border p-3 text-sm"
+                  >
                     <RadioGroupItem value={a.id} className="mt-0.5" />
                     <div>
                       <div className="font-medium">
                         {a.fullName} · {a.phone}
-                        {a.label ? <span className="text-muted-foreground ml-2">({a.label})</span> : null}
+                        {a.label ? (
+                          <span className="ml-2 text-muted-foreground">
+                            ({a.label})
+                          </span>
+                        ) : null}
                       </div>
                       <div className="text-muted-foreground">
                         {a.line1}
                         {a.line2 ? `, ${a.line2}` : ""}, {a.city}
-                        {a.state ? `, ${a.state}` : ""} {a.postalCode ?? ""}, {a.country}
+                        {a.state ? `, ${a.state}` : ""} {a.postalCode ?? ""},{" "}
+                        {a.country}
                       </div>
                     </div>
                   </label>
@@ -160,14 +204,22 @@ function CheckoutPage() {
                 ).map(([name, label, required]) => (
                   <div key={name} className="space-y-1">
                     <Label htmlFor={`addr-${name}`}>{label}</Label>
-                    <Input id={`addr-${name}`} name={name} required={required} />
+                    <Input
+                      id={`addr-${name}`}
+                      name={name}
+                      required={required}
+                    />
                   </div>
                 ))}
                 <div className="col-span-2 flex gap-2">
                   <Button type="submit" disabled={addAddress.isPending}>
                     Save address
                   </Button>
-                  <Button type="button" variant="ghost" onClick={() => setShowNew(false)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowNew(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -195,7 +247,12 @@ function CheckoutPage() {
                 <span>{formatMoney(cart.subtotalCents, currency)}</span>
               </div>
             </div>
-            <Button className="w-full" size="lg" onClick={place} disabled={placing || !chosen}>
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={place}
+              disabled={placing || !chosen}
+            >
               {placing ? "Placing…" : "Place order (pay on delivery)"}
             </Button>
           </CardContent>

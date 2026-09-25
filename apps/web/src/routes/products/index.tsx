@@ -58,7 +58,9 @@ function ProductsPage() {
     })
   }
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
+  const totalPages = data
+    ? Math.max(1, Math.ceil(data.total / data.pageSize))
+    : 1
   const items = data?.items
 
   return (
@@ -67,7 +69,9 @@ function ProductsPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            const q = String(new FormData(e.currentTarget).get("q") ?? "").trim()
+            const q = String(
+              new FormData(e.currentTarget).get("q") ?? ""
+            ).trim()
             patch({ q: q || undefined, page: 1 })
           }}
           className="flex flex-1 gap-2"
@@ -85,7 +89,9 @@ function ProductsPage() {
 
         <Select
           value={search.category ?? "all"}
-          onValueChange={(v) => patch({ category: v && v !== "all" ? v : undefined, page: 1 })}
+          onValueChange={(v) =>
+            patch({ category: v && v !== "all" ? v : undefined, page: 1 })
+          }
         >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Category" />
@@ -102,7 +108,9 @@ function ProductsPage() {
 
         <Select
           value={search.tag ?? "all"}
-          onValueChange={(v) => patch({ tag: v && v !== "all" ? v : undefined, page: 1 })}
+          onValueChange={(v) =>
+            patch({ tag: v && v !== "all" ? v : undefined, page: 1 })
+          }
         >
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Tag" />
@@ -121,20 +129,30 @@ function ProductsPage() {
           type="number"
           placeholder="Min $"
           defaultValue={search.min ?? ""}
-          onBlur={(e) => patch({ min: e.target.value ? Number(e.target.value) : undefined, page: 1 })}
+          onBlur={(e) =>
+            patch({
+              min: e.target.value ? Number(e.target.value) : undefined,
+              page: 1,
+            })
+          }
           className="w-24"
         />
         <Input
           type="number"
           placeholder="Max $"
           defaultValue={search.max ?? ""}
-          onBlur={(e) => patch({ max: e.target.value ? Number(e.target.value) : undefined, page: 1 })}
+          onBlur={(e) =>
+            patch({
+              max: e.target.value ? Number(e.target.value) : undefined,
+              page: 1,
+            })
+          }
           className="w-24"
         />
 
         <Select
           value={search.sort ?? "newest"}
-          onValueChange={(v) => patch({ sort: (v ?? "newest"), page: 1 })}
+          onValueChange={(v) => patch({ sort: v ?? "newest", page: 1 })}
         >
           <SelectTrigger className="w-36">
             <SelectValue />
@@ -147,13 +165,24 @@ function ProductsPage() {
         </Select>
       </div>
 
-      {(search.q || search.category || search.tag || search.min || search.max) && (
-        <p className="text-muted-foreground mb-4 text-sm">
+      {(search.q ||
+        search.category ||
+        search.tag ||
+        search.min ||
+        search.max) && (
+        <p className="mb-4 text-sm text-muted-foreground">
           {data?.total ?? 0} results
           <button
             className="ml-3 underline"
             onClick={() =>
-              patch({ q: undefined, category: undefined, tag: undefined, min: undefined, max: undefined, page: 1 })
+              patch({
+                q: undefined,
+                category: undefined,
+                tag: undefined,
+                min: undefined,
+                max: undefined,
+                page: 1,
+              })
             }
           >
             clear filters
@@ -170,7 +199,7 @@ function ProductsPage() {
       </div>
 
       {items?.length === 0 && (
-        <div className="text-muted-foreground py-16 text-center text-sm">
+        <div className="py-16 text-center text-sm text-muted-foreground">
           No products match these filters.
         </div>
       )}

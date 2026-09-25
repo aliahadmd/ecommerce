@@ -41,12 +41,18 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent
-  
+  ChartTooltipContent,
 } from "@/components/ui/chart"
-import type {ChartConfig} from "@/components/ui/chart";
+import type { ChartConfig } from "@/components/ui/chart"
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
-import { Users, Store, Package, ShoppingCart, DollarSign, Ban } from "lucide-react"
+import {
+  Users,
+  Store,
+  Package,
+  ShoppingCart,
+  DollarSign,
+  Ban,
+} from "lucide-react"
 
 export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
@@ -64,7 +70,7 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between pb-2">
-        <CardTitle className="text-muted-foreground text-xs font-medium">
+        <CardTitle className="text-xs font-medium text-muted-foreground">
           {label}
         </CardTitle>
         {icon}
@@ -89,7 +95,9 @@ function AdminDashboard() {
     queryKey: ["admin-users"],
     queryFn: () => adminListUsers().then(unwrap),
   })
-  const [banning, setBanning] = useState<{ id: string; name: string } | null>(null)
+  const [banning, setBanning] = useState<{ id: string; name: string } | null>(
+    null
+  )
   const [reason, setReason] = useState("")
 
   const setRole = useMutation({
@@ -121,22 +129,49 @@ function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard icon={<Users className="text-muted-foreground size-4" />} label="Users" value={String(stats?.users ?? "–")} />
-        <StatCard icon={<Store className="text-muted-foreground size-4" />} label="Sellers" value={String(stats?.sellers ?? "–")} />
-        <StatCard icon={<Package className="text-muted-foreground size-4" />} label="Active products" value={String(stats?.products ?? "–")} />
-        <StatCard icon={<ShoppingCart className="text-muted-foreground size-4" />} label="Orders (30d)" value={String(stats?.orders30d ?? "–")} />
-        <StatCard icon={<DollarSign className="text-muted-foreground size-4" />} label="Revenue paid (30d)" value={stats ? formatMoney(stats.revenueCents) : "–"} />
+        <StatCard
+          icon={<Users className="size-4 text-muted-foreground" />}
+          label="Users"
+          value={String(stats?.users ?? "–")}
+        />
+        <StatCard
+          icon={<Store className="size-4 text-muted-foreground" />}
+          label="Sellers"
+          value={String(stats?.sellers ?? "–")}
+        />
+        <StatCard
+          icon={<Package className="size-4 text-muted-foreground" />}
+          label="Active products"
+          value={String(stats?.products ?? "–")}
+        />
+        <StatCard
+          icon={<ShoppingCart className="size-4 text-muted-foreground" />}
+          label="Orders (30d)"
+          value={String(stats?.orders30d ?? "–")}
+        />
+        <StatCard
+          icon={<DollarSign className="size-4 text-muted-foreground" />}
+          label="Revenue paid (30d)"
+          value={stats ? formatMoney(stats.revenueCents) : "–"}
+        />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Orders per day (last 30 days)</CardTitle>
+          <CardTitle className="text-base">
+            Orders per day (last 30 days)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-56 w-full">
             <BarChart data={chartData}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+              <XAxis
+                dataKey="day"
+                tickLine={false}
+                axisLine={false}
+                fontSize={11}
+              />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="orders" fill="var(--color-count)" radius={4} />
             </BarChart>
@@ -164,12 +199,16 @@ function AdminDashboard() {
                 <TableRow key={u.id}>
                   <TableCell>
                     <div className="font-medium">{u.name}</div>
-                    <div className="text-muted-foreground text-xs">{u.email}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {u.email}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Select
                       value={u.role}
-                      onValueChange={(v) => setRole.mutate({ userId: u.id, role: v as Role })}
+                      onValueChange={(v) =>
+                        setRole.mutate({ userId: u.id, role: v as Role })
+                      }
                     >
                       <SelectTrigger className="w-32">
                         <SelectValue />
@@ -196,7 +235,9 @@ function AdminDashboard() {
                       <Button
                         variant="outline"
                         size="xs"
-                        onClick={() => setBanned.mutate({ userId: u.id, banned: false })}
+                        onClick={() =>
+                          setBanned.mutate({ userId: u.id, banned: false })
+                        }
                       >
                         Unban
                       </Button>
@@ -239,7 +280,8 @@ function AdminDashboard() {
               variant="destructive"
               disabled={!reason.trim()}
               onClick={() =>
-                banning && setBanned.mutate({ userId: banning.id, banned: true, reason })
+                banning &&
+                setBanned.mutate({ userId: banning.id, banned: true, reason })
               }
             >
               Ban user

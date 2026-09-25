@@ -1,5 +1,18 @@
 import { createServerFn } from "@tanstack/react-start"
-import { db, schema, and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "@ecommerce/db"
+import {
+  db,
+  schema,
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  or,
+  sql,
+} from "@ecommerce/db"
 import { cachedJson, invalidateCache } from "@ecommerce/redis"
 import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
@@ -37,39 +50,42 @@ export const getCategories = createServerFn({ method: "GET" }).handler(() =>
           sortOrder: schema.categories.sortOrder,
         })
         .from(schema.categories)
-        .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name)),
-    ),
-  ),
+        .orderBy(asc(schema.categories.sortOrder), asc(schema.categories.name))
+    )
+  )
 )
 
 export const getTags = createServerFn({ method: "GET" }).handler(() =>
   guard(async () => {
     return db.select().from(schema.tags).orderBy(asc(schema.tags.name))
-  }),
+  })
 )
 
 // ─── Admin: taxonomy management ─────────────────────────────────────────────
 
 const categoryInput = (input: unknown) => {
-  const parsed = (
-    input as {
-      name?: unknown
-      description?: unknown
-      parentId?: unknown
-    }
-  ) as { name: string; description?: string; parentId?: string | null }
+  const parsed = input as {
+    name?: unknown
+    description?: unknown
+    parentId?: unknown
+  } as { name: string; description?: string; parentId?: string | null }
   const name = String(parsed.name ?? "").trim()
   if (name.length < 2 || name.length > 80) {
     throw new AppError("INVALID", "Name must be 2–80 characters")
   }
   return {
     name,
-    description: parsed.description ? String(parsed.description).slice(0, 500) : null,
+    description: parsed.description
+      ? String(parsed.description).slice(0, 500)
+      : null,
     parentId: parsed.parentId || null,
   }
 }
 
-async function assertValidParent(parentId: string | null, selfId?: string): Promise<void> {
+async function assertValidParent(
+  parentId: string | null,
+  selfId?: string
+): Promise<void> {
   if (!parentId) return
   const seen = new Set<string>()
   let cursor: string | null = parentId
@@ -91,7 +107,7 @@ async function assertValidParent(parentId: string | null, selfId?: string): Prom
 
 async function uniqueSlug(
   table: typeof schema.categories | typeof schema.tags,
-  name: string,
+  name: string
 ): Promise<string> {
   const base = slugify(name)
   const isCategories = table === schema.categories
@@ -122,7 +138,7 @@ export const createCategory = createServerFn({ method: "POST" })
         .returning()
       await invalidateCache("catalog:categories:v1")
       return row
-    }),
+    })
   )
 
 export const updateCategory = createServerFn({ method: "POST" })
@@ -137,13 +153,17 @@ export const updateCategory = createServerFn({ method: "POST" })
       await assertValidParent(data.parentId, data.id)
       const [row] = await db
         .update(schema.categories)
-        .set({ name: data.name, description: data.description, parentId: data.parentId })
+        .set({
+          name: data.name,
+          description: data.description,
+          parentId: data.parentId,
+        })
         .where(eq(schema.categories.id, data.id))
         .returning()
       if (!row) throw new AppError("NOT_FOUND", "Category not found")
       await invalidateCache("catalog:categories:v1")
       return row
-    }),
+    })
   )
 
 export const deleteCategory = createServerFn({ method: "POST" })
@@ -155,17 +175,22 @@ export const deleteCategory = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
-      const inUse = await db.$count(schema.products, eq(schema.products.categoryId, data.id))
+      const inUse = await db.$count(
+        schema.products,
+        eq(schema.products.categoryId, data.id)
+      )
       if (inUse > 0) {
         throw new AppError(
           "IN_USE",
-          `Cannot delete — ${inUse} product(s) use this category. Reassign them first.`,
+          `Cannot delete — ${inUse} product(s) use this category. Reassign them first.`
         )
       }
-      await db.delete(schema.categories).where(eq(schema.categories.id, data.id))
+      await db
+        .delete(schema.categories)
+        .where(eq(schema.categories.id, data.id))
       await invalidateCache("catalog:categories:v1")
       return { deleted: true }
-    }),
+    })
   )
 
 export const createTag = createServerFn({ method: "POST" })
@@ -180,9 +205,12 @@ export const createTag = createServerFn({ method: "POST" })
     guard(async () => {
       await requireRole("super_admin")
       const slug = await uniqueSlug(schema.tags, data.name)
-      const [row] = await db.insert(schema.tags).values({ name: data.name, slug }).returning()
+      const [row] = await db
+        .insert(schema.tags)
+        .values({ name: data.name, slug })
+        .returning()
       return row
-    }),
+    })
   )
 
 export const deleteTag = createServerFn({ method: "POST" })
@@ -196,7 +224,7 @@ export const deleteTag = createServerFn({ method: "POST" })
       await requireRole("super_admin")
       await db.delete(schema.tags).where(eq(schema.tags.id, data.id))
       return { deleted: true }
-    }),
+    })
   )
 
 // ─── Public: browse ─────────────────────────────────────────────────────────
@@ -251,14 +279,21 @@ export const listProducts = createServerFn({ method: "GET" })
         conditions.push(
           or(
             ilike(schema.products.title, like),
-            ilike(schema.products.description, like),
-          )!,
+            ilike(schema.products.description, like)
+          )!
         )
       }
-      if (data.category) conditions.push(eq(schema.categories.slug, data.category))
+      if (data.category)
+        conditions.push(eq(schema.categories.slug, data.category))
       if (data.tag) conditions.push(eq(schema.tags.slug, data.tag))
-      if (data.min !== undefined) conditions.push(gte(schema.products.priceCents, Math.round(data.min * 100)))
-      if (data.max !== undefined) conditions.push(lte(schema.products.priceCents, Math.round(data.max * 100)))
+      if (data.min !== undefined)
+        conditions.push(
+          gte(schema.products.priceCents, Math.round(data.min * 100))
+        )
+      if (data.max !== undefined)
+        conditions.push(
+          lte(schema.products.priceCents, Math.round(data.max * 100))
+        )
 
       const where = and(...conditions)
 
@@ -273,12 +308,18 @@ export const listProducts = createServerFn({ method: "GET" })
         .select(productCardColumns)
         .from(schema.products)
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
-        .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+        .leftJoin(
+          schema.categories,
+          eq(schema.products.categoryId, schema.categories.id)
+        )
         .$dynamic()
 
       if (data.tag) {
         query = query
-          .innerJoin(schema.productTags, eq(schema.productTags.productId, schema.products.id))
+          .innerJoin(
+            schema.productTags,
+            eq(schema.productTags.productId, schema.products.id)
+          )
           .innerJoin(schema.tags, eq(schema.productTags.tagId, schema.tags.id))
       }
 
@@ -292,17 +333,23 @@ export const listProducts = createServerFn({ method: "GET" })
         .select({ total: sql<number>`count(*)::int` })
         .from(schema.products)
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
-        .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+        .leftJoin(
+          schema.categories,
+          eq(schema.products.categoryId, schema.categories.id)
+        )
         .$dynamic()
       if (data.tag) {
         countQuery = countQuery
-          .innerJoin(schema.productTags, eq(schema.productTags.productId, schema.products.id))
+          .innerJoin(
+            schema.productTags,
+            eq(schema.productTags.productId, schema.products.id)
+          )
           .innerJoin(schema.tags, eq(schema.productTags.tagId, schema.tags.id))
       }
       const [{ total }] = await countQuery.where(where)
 
       return { items, total, page: data.page, pageSize: PAGE_SIZE }
-    }),
+    })
   )
 
 export const getProduct = createServerFn({ method: "GET" })
@@ -329,7 +376,10 @@ export const getProduct = createServerFn({ method: "GET" })
         })
         .from(schema.products)
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
-        .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+        .leftJoin(
+          schema.categories,
+          eq(schema.products.categoryId, schema.categories.id)
+        )
         .where(eq(schema.products.slug, data.slug))
         .limit(1)
       if (!row) throw new AppError("NOT_FOUND", "Product not found")
@@ -350,13 +400,17 @@ export const getProduct = createServerFn({ method: "GET" })
         .where(eq(schema.productImages.productId, row.product.id))
         .orderBy(asc(schema.productImages.sortOrder))
       const tags = await db
-        .select({ id: schema.tags.id, name: schema.tags.name, slug: schema.tags.slug })
+        .select({
+          id: schema.tags.id,
+          name: schema.tags.name,
+          slug: schema.tags.slug,
+        })
         .from(schema.productTags)
         .innerJoin(schema.tags, eq(schema.productTags.tagId, schema.tags.id))
         .where(eq(schema.productTags.productId, row.product.id))
 
       return { ...row, images, tags }
-    }),
+    })
   )
 
 export const getShop = createServerFn({ method: "GET" })
@@ -379,11 +433,16 @@ export const getShop = createServerFn({ method: "GET" })
         .select(productCardColumns)
         .from(schema.products)
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
-        .where(and(eq(schema.products.shopId, shop.id), eq(schema.products.status, "active")))
+        .where(
+          and(
+            eq(schema.products.shopId, shop.id),
+            eq(schema.products.status, "active")
+          )
+        )
         .orderBy(desc(schema.products.createdAt))
         .limit(24)
       return { shop, items }
-    }),
+    })
   )
 
 // ─── Seller: product management ─────────────────────────────────────────────
@@ -433,7 +492,7 @@ export const listSellerProducts = createServerFn({ method: "GET" })
         .offset((data.page - 1) * data.pageSize)
       const total = await db.$count(schema.products, where)
       return { rows, total, page: data.page, pageSize: data.pageSize }
-    }),
+    })
   )
 
 async function myShop(userId: string) {
@@ -452,9 +511,12 @@ const productFields = (input: unknown) => {
   const description = String(raw.description ?? "").trim()
   const priceCents = parsePriceToCents(String(raw.price ?? ""))
   const stock = Number(raw.stock ?? 0)
-  const status: "active" | "draft" = raw.status === "active" ? "active" : "draft"
+  const status: "active" | "draft" =
+    raw.status === "active" ? "active" : "draft"
   const categoryId = raw.categoryId ? String(raw.categoryId) : null
-  const tagIds = Array.isArray(raw.tagIds) ? (raw.tagIds as string[]).map(String) : []
+  const tagIds = Array.isArray(raw.tagIds)
+    ? (raw.tagIds as string[]).map(String)
+    : []
   if (title.length < 3 || title.length > 200) {
     throw new AppError("INVALID", "Title must be 3–200 characters")
   }
@@ -489,32 +551,37 @@ export const createProduct = createServerFn({ method: "POST" })
         return await db.transaction(async (tx) => {
           const [product] = await tx
             .insert(schema.products)
-          .values({
-            shopId: shop.id,
-            categoryId: data.categoryId,
-            title: data.title,
-            slug,
-            description: data.description,
-            priceCents: data.priceCents,
-            stock: data.stock,
-            status: data.status,
-          })
-          .returning()
+            .values({
+              shopId: shop.id,
+              categoryId: data.categoryId,
+              title: data.title,
+              slug,
+              description: data.description,
+              priceCents: data.priceCents,
+              stock: data.stock,
+              status: data.status,
+            })
+            .returning()
           if (data.tagIds.length > 0) {
             await tx
               .insert(schema.productTags)
-              .values(data.tagIds.map((tagId) => ({ productId: product.id, tagId })))
+              .values(
+                data.tagIds.map((tagId) => ({ productId: product.id, tagId }))
+              )
               .onConflictDoNothing()
           }
           return { id: product.id, slug: product.slug }
         })
       } catch (err) {
         if (isUniqueViolation(err)) {
-          throw new AppError("TAKEN", "A product with a similar title already exists — try another title")
+          throw new AppError(
+            "TAKEN",
+            "A product with a similar title already exists — try another title"
+          )
         }
         throw err
       }
-    }),
+    })
   )
 
 export const getProductForEdit = createServerFn({ method: "GET" })
@@ -554,7 +621,7 @@ export const getProductForEdit = createServerFn({ method: "GET" })
         images,
         tagIds: tags.map((t) => t.id),
       }
-    }),
+    })
   )
 
 export const updateProduct = createServerFn({ method: "POST" })
@@ -601,7 +668,7 @@ export const updateProduct = createServerFn({ method: "POST" })
         }
         return { id: product.id, slug: product.slug }
       })
-    }),
+    })
   )
 
 export const archiveProduct = createServerFn({ method: "POST" })
@@ -633,7 +700,7 @@ export const archiveProduct = createServerFn({ method: "POST" })
         .set({ status: data.status })
         .where(eq(schema.products.id, data.id))
       return { ok: true }
-    }),
+    })
   )
 
 // ─── Admin: moderation ──────────────────────────────────────────────────────
@@ -652,7 +719,9 @@ export const adminListProducts = createServerFn({ method: "GET" })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
-      const where = data.status ? eq(schema.products.status, data.status) : undefined
+      const where = data.status
+        ? eq(schema.products.status, data.status)
+        : undefined
       const rows = await db
         .select({
           ...productCardColumns,
@@ -667,7 +736,7 @@ export const adminListProducts = createServerFn({ method: "GET" })
         .offset((data.page - 1) * 20)
       const total = await db.$count(schema.products, where)
       return { rows, total }
-    }),
+    })
   )
 
 export const adminListProductsByIds = createServerFn({ method: "GET" })
@@ -680,6 +749,9 @@ export const adminListProductsByIds = createServerFn({ method: "GET" })
     guard(async () => {
       await requireRole("super_admin")
       if (data.ids.length === 0) return []
-      return db.select().from(schema.products).where(inArray(schema.products.id, data.ids))
-    }),
+      return db
+        .select()
+        .from(schema.products)
+        .where(inArray(schema.products.id, data.ids))
+    })
   )

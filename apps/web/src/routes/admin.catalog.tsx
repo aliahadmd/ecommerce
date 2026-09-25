@@ -63,9 +63,17 @@ function AdminCatalogPage() {
 
 function CategoriesPanel() {
   const queryClient = useQueryClient()
-  const { data } = useQuery({ queryKey: ["categories"], queryFn: () => getCategories().then(unwrap) })
+  const { data } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => getCategories().then(unwrap),
+  })
   const categories = data ?? []
-  const [editing, setEditing] = useState<{ id?: string; name: string; description: string; parentId: string | null } | null>(null)
+  const [editing, setEditing] = useState<{
+    id?: string
+    name: string
+    description: string
+    parentId: string | null
+  } | null>(null)
 
   const save = useMutation({
     mutationFn: async () => {
@@ -97,13 +105,18 @@ function CategoriesPanel() {
     },
   })
 
-  const nameOf = (id: string | null) => categories.find((c) => c.id === id)?.name
+  const nameOf = (id: string | null) =>
+    categories.find((c) => c.id === id)?.name
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Categories</h1>
-        <Button onClick={() => setEditing({ name: "", description: "", parentId: null })}>
+        <Button
+          onClick={() =>
+            setEditing({ name: "", description: "", parentId: null })
+          }
+        >
           New category
         </Button>
       </div>
@@ -122,7 +135,9 @@ function CategoriesPanel() {
             {categories.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-muted-foreground">{c.slug}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {c.slug}
+                </TableCell>
                 <TableCell>{nameOf(c.parentId) ?? "—"}</TableCell>
                 <TableCell>—</TableCell>
                 <TableCell className="text-right">
@@ -154,10 +169,15 @@ function CategoriesPanel() {
         </Table>
       </div>
 
-      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(open) => !open && setEditing(null)}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing?.id ? "Edit category" : "New category"}</DialogTitle>
+            <DialogTitle>
+              {editing?.id ? "Edit category" : "New category"}
+            </DialogTitle>
           </DialogHeader>
           {editing && (
             <div className="space-y-4">
@@ -166,7 +186,9 @@ function CategoriesPanel() {
                 <Input
                   id="cat-name"
                   value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, name: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-1.5">
@@ -175,14 +197,21 @@ function CategoriesPanel() {
                   id="cat-desc"
                   rows={2}
                   value={editing.description}
-                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, description: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Parent (optional)</Label>
                 <Select
                   value={editing.parentId ?? "none"}
-                  onValueChange={(v) => setEditing({ ...editing, parentId: v === "none" ? null : v })}
+                  onValueChange={(v) =>
+                    setEditing({
+                      ...editing,
+                      parentId: v === "none" ? null : v,
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -205,7 +234,10 @@ function CategoriesPanel() {
             <Button variant="outline" onClick={() => setEditing(null)}>
               Cancel
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !editing?.name}>
+            <Button
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !editing?.name}
+            >
               Save
             </Button>
           </DialogFooter>
@@ -217,7 +249,10 @@ function CategoriesPanel() {
 
 function TagsPanel() {
   const queryClient = useQueryClient()
-  const { data } = useQuery({ queryKey: ["tags"], queryFn: () => getTags().then(unwrap) })
+  const { data } = useQuery({
+    queryKey: ["tags"],
+    queryFn: () => getTags().then(unwrap),
+  })
   const tags = data ?? []
   const [newName, setNewName] = useState("")
 

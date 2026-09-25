@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { uploadProductImage, deleteProductImage, setPrimaryImage } from "@/server/uploads"
+import {
+  uploadProductImage,
+  deleteProductImage,
+  setPrimaryImage,
+} from "@/server/uploads"
 import { Progress } from "@/components/ui/progress"
 
 interface ImageRow {
@@ -36,12 +40,14 @@ export function ImageUploader({
       }
       if (failed.length > 0) {
         throw new Error(
-          `Uploaded ${uploaded}/${files.length}. Failed: ${failed.join(", ")}`,
+          `Uploaded ${uploaded}/${files.length}. Failed: ${failed.join(", ")}`
         )
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["product-edit", productId] })
+      void queryClient.invalidateQueries({
+        queryKey: ["product-edit", productId],
+      })
       void queryClient.invalidateQueries({ queryKey: ["product", productId] })
     },
     onError: (err) => toast.error(err.message),
@@ -51,16 +57,21 @@ export function ImageUploader({
     mutationFn: (imageId: string) => deleteProductImage({ data: { imageId } }),
     onSuccess: (result) => {
       if (!result.ok) toast.error(result.error.message)
-      void queryClient.invalidateQueries({ queryKey: ["product-edit", productId] })
+      void queryClient.invalidateQueries({
+        queryKey: ["product-edit", productId],
+      })
       void queryClient.invalidateQueries({ queryKey: ["product", productId] })
     },
   })
 
   const makePrimary = useMutation({
-    mutationFn: (imageId: string) => setPrimaryImage({ data: { productId, imageId } }),
+    mutationFn: (imageId: string) =>
+      setPrimaryImage({ data: { productId, imageId } }),
     onSuccess: (result) => {
       if (!result.ok) toast.error(result.error.message)
-      void queryClient.invalidateQueries({ queryKey: ["product-edit", productId] })
+      void queryClient.invalidateQueries({
+        queryKey: ["product-edit", productId],
+      })
       void queryClient.invalidateQueries({ queryKey: ["product", productId] })
     },
   })
@@ -69,8 +80,15 @@ export function ImageUploader({
     <div>
       <div className="grid grid-cols-5 gap-2">
         {images.map((img, i) => (
-          <div key={img.id} className="group bg-muted relative aspect-square overflow-hidden rounded-lg">
-            <img src={img.url} alt={img.alt ?? ""} className="h-full w-full object-cover" />
+          <div
+            key={img.id}
+            className="group relative aspect-square overflow-hidden rounded-lg bg-muted"
+          >
+            <img
+              src={img.url}
+              alt={img.alt ?? ""}
+              className="h-full w-full object-cover"
+            />
             {i === 0 && (
               <span className="absolute top-1 left-1 rounded bg-black/60 px-1 text-[10px] text-white">
                 primary
@@ -97,7 +115,7 @@ export function ImageUploader({
           </div>
         ))}
         {images.length < 8 && (
-          <label className="border-input bg-muted/30 hover:bg-muted flex aspect-square cursor-pointer items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
+          <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border border-dashed border-input bg-muted/30 text-xs text-muted-foreground hover:bg-muted">
             {upload.isPending ? (
               <Progress value={30} className="w-8" />
             ) : (
@@ -116,8 +134,9 @@ export function ImageUploader({
           </label>
         )}
       </div>
-      <p className="text-muted-foreground mt-1.5 text-xs">
-        JPEG/PNG/WebP, up to 5MB, max 8 images. First image is the product photo.
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        JPEG/PNG/WebP, up to 5MB, max 8 images. First image is the product
+        photo.
       </p>
     </div>
   )

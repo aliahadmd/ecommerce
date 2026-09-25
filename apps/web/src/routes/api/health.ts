@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/health")({
         const ok = Object.values(checks).every((v) => v === "ok")
         return Response.json(
           { status: ok ? "ok" : "fail", ...checks },
-          { status: ok ? 200 : 503 },
+          { status: ok ? 200 : 503 }
         )
       },
     },

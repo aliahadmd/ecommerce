@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm"
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -12,10 +12,10 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-} from "drizzle-orm/pg-core"
-import { users } from "./auth"
-import { products } from "./catalog"
-import { shops } from "./shops"
+} from "drizzle-orm/pg-core";
+import { users } from "./auth";
+import { products } from "./catalog";
+import { shops } from "./shops";
 
 export const orderStatus = pgEnum("order_status", [
   "pending",
@@ -23,11 +23,11 @@ export const orderStatus = pgEnum("order_status", [
   "shipped",
   "delivered",
   "cancelled",
-])
+]);
 
-export const paymentMethod = pgEnum("payment_method", ["cod"])
+export const paymentMethod = pgEnum("payment_method", ["cod"]);
 
-export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "void"])
+export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "void"]);
 
 export const carts = pgTable("carts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -35,14 +35,12 @@ export const carts = pgTable("carts", {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-})
+});
 
 export const cartItems = pgTable(
   "cart_items",
@@ -55,9 +53,7 @@ export const cartItems = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "restrict" }),
     quantity: integer("quantity").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -67,7 +63,7 @@ export const cartItems = pgTable(
     uniqueIndex("cart_items_unique").on(t.cartId, t.productId),
     check("cart_items_quantity_check", sql`${t.quantity} > 0`),
   ],
-)
+);
 
 export const addresses = pgTable("addresses", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -84,14 +80,12 @@ export const addresses = pgTable("addresses", {
   postalCode: text("postal_code"),
   country: text("country").notNull().default("US"),
   isDefault: boolean("is_default").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-})
+});
 
 export const orders = pgTable(
   "orders",
@@ -119,16 +113,14 @@ export const orders = pgTable(
     shipPostalCode: text("ship_postal_code"),
     shipCountry: text("ship_country").notNull(),
     cancelReason: text("cancel_reason"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
   (t) => [index("orders_buyer_created_idx").on(t.buyerId, t.createdAt)],
-)
+);
 
 export const orderItems = pgTable(
   "order_items",
@@ -150,16 +142,14 @@ export const orderItems = pgTable(
     unitPriceCents: integer("unit_price_cents").notNull(),
     quantity: integer("quantity").notNull(),
     totalCents: integer("total_cents").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("order_items_order_idx").on(t.orderId),
     index("order_items_shop_idx").on(t.shopId),
     check("order_items_quantity_check", sql`${t.quantity} > 0`),
   ],
-)
+);
 
 // better-auth database rate-limit storage (survives restarts, works across
 // instances) — enabled via `rateLimit.storage: "database"` in packages/auth.
@@ -171,4 +161,4 @@ export const rateLimits = pgTable("rate_limits", {
   lastRequest: bigint("last_request", { mode: "number" })
     .notNull()
     .$defaultFn(() => Date.now()),
-})
+});

@@ -43,7 +43,9 @@ export function OrderActions({
 
   const transition = useMutation({
     mutationFn: (input: { status: OrderStatus; reason?: string }) =>
-      updateOrderStatus({ data: { orderId, status: input.status, reason: input.reason } }),
+      updateOrderStatus({
+        data: { orderId, status: input.status, reason: input.reason },
+      }),
     onSuccess: (r, vars) => {
       if (!r.ok) {
         toast.error(r.error.message)
@@ -74,38 +76,58 @@ export function OrderActions({
         onClick={() => transition.mutate({ status: "confirmed" })}
       >
         Confirm
-      </Button>,
+      </Button>
     )
   }
   if (status === "confirmed" && role !== "buyer") {
     buttons.push(
-      <Button key="ship" size="xs" onClick={() => transition.mutate({ status: "shipped" })}>
+      <Button
+        key="ship"
+        size="xs"
+        onClick={() => transition.mutate({ status: "shipped" })}
+      >
         Ship
-      </Button>,
+      </Button>
     )
   }
   if (status === "shipped" && role !== "buyer") {
     buttons.push(
-      <Button key="deliver" size="xs" onClick={() => transition.mutate({ status: "delivered" })}>
+      <Button
+        key="deliver"
+        size="xs"
+        onClick={() => transition.mutate({ status: "delivered" })}
+      >
         Mark delivered
-      </Button>,
+      </Button>
     )
   }
   if (
-    (status === "delivered" && role !== "buyer" && paymentStatus === "unpaid") ||
+    (status === "delivered" &&
+      role !== "buyer" &&
+      paymentStatus === "unpaid") ||
     (role === "super_admin" && paymentStatus === "unpaid")
   ) {
     buttons.push(
-      <Button key="paid" size="xs" variant="secondary" onClick={() => markPaid.mutate()}>
+      <Button
+        key="paid"
+        size="xs"
+        variant="secondary"
+        onClick={() => markPaid.mutate()}
+      >
         Mark paid (cash)
-      </Button>,
+      </Button>
     )
   }
   if (status === "pending" || status === "confirmed") {
     buttons.push(
-      <Button key="cancel" size="xs" variant="outline" onClick={() => setCancelling(true)}>
+      <Button
+        key="cancel"
+        size="xs"
+        variant="outline"
+        onClick={() => setCancelling(true)}
+      >
         Cancel
-      </Button>,
+      </Button>
     )
   }
 
@@ -129,7 +151,12 @@ export function OrderActions({
             <Button
               variant="destructive"
               disabled={!reason.trim()}
-              onClick={() => transition.mutate({ status: "cancelled", reason: reason.trim() })}
+              onClick={() =>
+                transition.mutate({
+                  status: "cancelled",
+                  reason: reason.trim(),
+                })
+              }
             >
               Cancel order
             </Button>

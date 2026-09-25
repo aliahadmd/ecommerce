@@ -25,12 +25,18 @@ function OrderDetailPage() {
     queryFn: () => getMyOrder({ data: { id } }).then(unwrap),
   })
 
-  if (!data) return <main className="mx-auto max-w-3xl px-4 py-8">Loading…</main>
+  if (!data)
+    return <main className="mx-auto max-w-3xl px-4 py-8">Loading…</main>
   const { order, items } = data
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <Button render={<Link to="/account/orders" search={{}} />} variant="ghost" size="sm" className="mb-4">
+      <Button
+        render={<Link to="/account/orders" search={{}} />}
+        variant="ghost"
+        size="sm"
+        className="mb-4"
+      >
         ← All orders
       </Button>
       <Card>
@@ -38,7 +44,9 @@ function OrderDetailPage() {
           <CardTitle className="flex items-center gap-3">
             {order.orderNumber}
             <Badge>{order.status}</Badge>
-            <Badge variant={order.paymentStatus === "paid" ? "default" : "outline"}>
+            <Badge
+              variant={order.paymentStatus === "paid" ? "default" : "outline"}
+            >
               {order.paymentStatus}
             </Badge>
           </CardTitle>
@@ -46,36 +54,54 @@ function OrderDetailPage() {
         <CardContent className="space-y-4 text-sm">
           {order.status === "pending" && (
             <p className="rounded-lg bg-muted p-3">
-              Your order is awaiting seller confirmation. Payment is cash on delivery.
+              Your order is awaiting seller confirmation. Payment is cash on
+              delivery.
             </p>
           )}
           <div className="grid gap-1">
             {items.map((i) => (
               <div key={i.id} className="flex items-center gap-3 py-1">
-                <div className="bg-muted size-10 overflow-hidden rounded-md">
-                  {i.imageUrl && <img src={i.imageUrl} alt="" className="h-full w-full object-cover" />}
+                <div className="size-10 overflow-hidden rounded-md bg-muted">
+                  {i.imageUrl && (
+                    <img
+                      src={i.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  )}
                 </div>
-                <Link to="/products/$slug" params={{ slug: i.slug }} className="flex-1 hover:underline">
+                <Link
+                  to="/products/$slug"
+                  params={{ slug: i.slug }}
+                  className="flex-1 hover:underline"
+                >
                   {i.title}
                 </Link>
                 <span className="text-muted-foreground">× {i.quantity}</span>
-                <span className="w-20 text-right">{formatMoney(i.totalCents, order.currency)}</span>
+                <span className="w-20 text-right">
+                  {formatMoney(i.totalCents, order.currency)}
+                </span>
               </div>
             ))}
           </div>
           <Separator />
           <div className="flex justify-between">
             <span className="text-muted-foreground">Total</span>
-            <span className="text-base font-semibold">{formatMoney(order.totalCents, order.currency)}</span>
+            <span className="text-base font-semibold">
+              {formatMoney(order.totalCents, order.currency)}
+            </span>
           </div>
           <Separator />
           <div className="text-muted-foreground">
             Deliver to: {order.shipName}, {order.shipLine1}
             {order.shipLine2 ? `, ${order.shipLine2}` : ""}, {order.shipCity}
-            {order.shipState ? `, ${order.shipState}` : ""} {order.shipPostalCode ?? ""},{" "}
-            {order.shipCountry} · {order.shipPhone}
+            {order.shipState ? `, ${order.shipState}` : ""}{" "}
+            {order.shipPostalCode ?? ""}, {order.shipCountry} ·{" "}
+            {order.shipPhone}
           </div>
-          {order.cancelReason && <p className="text-destructive">Cancelled: {order.cancelReason}</p>}
+          {order.cancelReason && (
+            <p className="text-destructive">Cancelled: {order.cancelReason}</p>
+          )}
         </CardContent>
       </Card>
     </main>

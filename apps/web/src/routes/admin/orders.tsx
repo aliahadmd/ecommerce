@@ -57,7 +57,7 @@ function AdminOrdersPage() {
               <TableRow key={o.id}>
                 <TableCell>
                   <div className="font-medium">{o.orderNumber}</div>
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-xs text-muted-foreground">
                     {new Date(o.createdAt).toLocaleString()}
                   </div>
                 </TableCell>
@@ -66,7 +66,9 @@ function AdminOrdersPage() {
                   <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={o.paymentStatus === "paid" ? "default" : "outline"}>
+                  <Badge
+                    variant={o.paymentStatus === "paid" ? "default" : "outline"}
+                  >
                     {o.paymentStatus}
                   </Badge>
                 </TableCell>
@@ -85,7 +87,10 @@ function AdminOrdersPage() {
             ))}
             {orders?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-12 text-center">
+                <TableCell
+                  colSpan={6}
+                  className="py-12 text-center text-muted-foreground"
+                >
                   No orders yet.
                 </TableCell>
               </TableRow>

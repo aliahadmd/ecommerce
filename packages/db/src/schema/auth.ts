@@ -1,19 +1,11 @@
-import {
-  boolean,
-  index,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core"
+import { boolean, index, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /**
  * better-auth core tables (drizzle adapter). Field KEYS stay camelCase —
  * better-auth maps by key. IDs are uuid; better-auth is configured with
  * `advanced.database.generateId` returning crypto.randomUUID().
  */
-export const userRole = pgEnum("user_role", ["super_admin", "seller", "buyer"])
+export const userRole = pgEnum("user_role", ["super_admin", "seller", "buyer"]);
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -26,14 +18,12 @@ export const users = pgTable("users", {
   banned: boolean("banned").notNull().default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-})
+});
 
 export const sessions = pgTable(
   "sessions",
@@ -48,16 +38,14 @@ export const sessions = pgTable(
     userAgent: text("user_agent"),
     // better-auth admin plugin impersonation
     impersonatedBy: uuid("impersonated_by"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
   (t) => [index("sessions_user_id_idx").on(t.userId)],
-)
+);
 
 export const accounts = pgTable(
   "accounts",
@@ -79,27 +67,23 @@ export const accounts = pgTable(
     }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
   (t) => [index("accounts_user_id_idx").on(t.userId)],
-)
+);
 
 export const verifications = pgTable("verifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-})
+});

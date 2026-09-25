@@ -45,12 +45,15 @@ function MyOrdersPage() {
                 >
                   {o.orderNumber}
                 </Link>
-                <p className="text-muted-foreground text-xs">
-                  {o.itemCount} item(s) · {new Date(o.createdAt).toLocaleDateString()}
+                <p className="text-xs text-muted-foreground">
+                  {o.itemCount} item(s) ·{" "}
+                  {new Date(o.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
-              <Badge variant={o.paymentStatus === "paid" ? "default" : "outline"}>
+              <Badge
+                variant={o.paymentStatus === "paid" ? "default" : "outline"}
+              >
                 {o.paymentStatus}
               </Badge>
               <span className="w-24 text-right text-sm font-semibold">
@@ -60,7 +63,7 @@ function MyOrdersPage() {
           </Card>
         ))}
         {orders?.length === 0 && (
-          <p className="text-muted-foreground py-12 text-center text-sm">
+          <p className="py-12 text-center text-sm text-muted-foreground">
             No orders yet — your placed orders will appear here.
           </p>
         )}

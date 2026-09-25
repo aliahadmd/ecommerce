@@ -18,8 +18,8 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
         .where(
           and(
             eq(schema.orders.paymentStatus, "paid"),
-            gte(schema.orders.createdAt, thirtyDaysAgo),
-          ),
+            gte(schema.orders.createdAt, thirtyDaysAgo)
+          )
         ),
     ])
 
@@ -34,7 +34,10 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
       .orderBy(sql`date_trunc('day', created_at)`)
 
     const ordersByStatus = await db
-      .select({ status: schema.orders.status, count: sql<number>`count(*)::int` })
+      .select({
+        status: schema.orders.status,
+        count: sql<number>`count(*)::int`,
+      })
       .from(schema.orders)
       .groupBy(schema.orders.status)
 
@@ -44,8 +47,14 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
         sold: sql<number>`coalesce(sum(${schema.orderItems.quantity}),0)::int`,
       })
       .from(schema.orderItems)
-      .innerJoin(schema.products, eq(schema.orderItems.productId, schema.products.id))
-      .leftJoin(schema.categories, eq(schema.products.categoryId, schema.categories.id))
+      .innerJoin(
+        schema.products,
+        eq(schema.orderItems.productId, schema.products.id)
+      )
+      .leftJoin(
+        schema.categories,
+        eq(schema.products.categoryId, schema.categories.id)
+      )
       .groupBy(schema.categories.name)
       .orderBy(desc(sql`coalesce(sum(${schema.orderItems.quantity}),0)`))
       .limit(5)
@@ -60,7 +69,7 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
       ordersByStatus,
       topCategories,
     }
-  }),
+  })
 )
 
 export const adminListUsers = createServerFn({ method: "GET" }).handler(() =>
@@ -80,11 +89,14 @@ export const adminListUsers = createServerFn({ method: "GET" }).handler(() =>
       .from(schema.users)
       .orderBy(desc(schema.users.createdAt))
       .limit(100)
-  }),
+  })
 )
 
 /** Keep shops consistent with the owner's account state. */
-async function setShopStatusFor(ownerId: string, status: "active" | "suspended"): Promise<void> {
+async function setShopStatusFor(
+  ownerId: string,
+  status: "active" | "suspended"
+): Promise<void> {
   await db
     .update(schema.shops)
     .set({ status })
@@ -115,7 +127,10 @@ export const adminSetUserRole = createServerFn({ method: "POST" })
           .where(eq(schema.shops.ownerId, data.userId))
           .limit(1)
         if (!shop) {
-          throw new AppError("INVALID", "This user has no shop — they must onboard as a seller first")
+          throw new AppError(
+            "INVALID",
+            "This user has no shop — they must onboard as a seller first"
+          )
         }
       }
       await db
@@ -127,12 +142,16 @@ export const adminSetUserRole = createServerFn({ method: "POST" })
         await setShopStatusFor(data.userId, "suspended")
       }
       return { ok: true }
-    }),
+    })
   )
 
 export const adminSetUserBanned = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
-    const raw = input as { userId?: unknown; banned?: unknown; reason?: unknown }
+    const raw = input as {
+      userId?: unknown
+      banned?: unknown
+      reason?: unknown
+    }
     const userId = String(raw.userId ?? "")
     const banned = Boolean(raw.banned)
     if (!userId) throw new AppError("INVALID", "userId required")
@@ -168,10 +187,11 @@ export const adminSetUserBanned = createServerFn({ method: "POST" })
           .from(schema.users)
           .where(eq(schema.users.id, data.userId))
           .limit(1)
-        if (user?.role === "seller") await setShopStatusFor(data.userId, "active")
+        if (user?.role === "seller")
+          await setShopStatusFor(data.userId, "active")
       }
       return { ok: true }
-    }),
+    })
   )
 
 export const getSellerStats = createServerFn({ method: "GET" }).handler(() =>
@@ -185,44 +205,63 @@ export const getSellerStats = createServerFn({ method: "GET" }).handler(() =>
     if (!shop) throw new AppError("FORBIDDEN", "Create your shop first")
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000)
 
-    const [activeProducts, pendingOrders, unpaidDelivered, revenue] = await Promise.all([
-      db.$count(
-        schema.products,
-        and(eq(schema.products.shopId, shop.id), eq(schema.products.status, "active")),
-      ),
-      db
-        .select({ count: sql<number>`count(distinct ${schema.orders.id})::int` })
-        .from(schema.orders)
-        .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
-        .where(
+    const [activeProducts, pendingOrders, unpaidDelivered, revenue] =
+      await Promise.all([
+        db.$count(
+          schema.products,
           and(
-            eq(schema.orderItems.shopId, shop.id),
-            inArray(schema.orders.status, ["pending", "confirmed"]),
-          ),
+            eq(schema.products.shopId, shop.id),
+            eq(schema.products.status, "active")
+          )
         ),
-      db
-        .select({ count: sql<number>`count(distinct ${schema.orders.id})::int` })
-        .from(schema.orders)
-        .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
-        .where(
-          and(
-            eq(schema.orderItems.shopId, shop.id),
-            eq(schema.orders.status, "delivered"),
-            eq(schema.orders.paymentStatus, "unpaid"),
+        db
+          .select({
+            count: sql<number>`count(distinct ${schema.orders.id})::int`,
+          })
+          .from(schema.orders)
+          .innerJoin(
+            schema.orderItems,
+            eq(schema.orderItems.orderId, schema.orders.id)
+          )
+          .where(
+            and(
+              eq(schema.orderItems.shopId, shop.id),
+              inArray(schema.orders.status, ["pending", "confirmed"])
+            )
           ),
-        ),
-      db
-        .select({ total: sql<number>`coalesce(sum(${schema.orderItems.totalCents}),0)::int` })
-        .from(schema.orderItems)
-        .innerJoin(schema.orders, eq(schema.orderItems.orderId, schema.orders.id))
-        .where(
-          and(
-            eq(schema.orderItems.shopId, shop.id),
-            eq(schema.orders.paymentStatus, "paid"),
-            gte(schema.orders.createdAt, thirtyDaysAgo),
+        db
+          .select({
+            count: sql<number>`count(distinct ${schema.orders.id})::int`,
+          })
+          .from(schema.orders)
+          .innerJoin(
+            schema.orderItems,
+            eq(schema.orderItems.orderId, schema.orders.id)
+          )
+          .where(
+            and(
+              eq(schema.orderItems.shopId, shop.id),
+              eq(schema.orders.status, "delivered"),
+              eq(schema.orders.paymentStatus, "unpaid")
+            )
           ),
-        ),
-    ])
+        db
+          .select({
+            total: sql<number>`coalesce(sum(${schema.orderItems.totalCents}),0)::int`,
+          })
+          .from(schema.orderItems)
+          .innerJoin(
+            schema.orders,
+            eq(schema.orderItems.orderId, schema.orders.id)
+          )
+          .where(
+            and(
+              eq(schema.orderItems.shopId, shop.id),
+              eq(schema.orders.paymentStatus, "paid"),
+              gte(schema.orders.createdAt, thirtyDaysAgo)
+            )
+          ),
+      ])
 
     const ordersPerDay = await db
       .select({
@@ -230,9 +269,15 @@ export const getSellerStats = createServerFn({ method: "GET" }).handler(() =>
         count: sql<number>`count(distinct "orders"."id")::int`,
       })
       .from(schema.orders)
-      .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
+      .innerJoin(
+        schema.orderItems,
+        eq(schema.orderItems.orderId, schema.orders.id)
+      )
       .where(
-        and(eq(schema.orderItems.shopId, shop.id), gte(schema.orders.createdAt, thirtyDaysAgo)),
+        and(
+          eq(schema.orderItems.shopId, shop.id),
+          gte(schema.orders.createdAt, thirtyDaysAgo)
+        )
       )
       .groupBy(sql`date_trunc('day', "orders"."created_at")`)
       .orderBy(sql`date_trunc('day', "orders"."created_at")`)
@@ -248,7 +293,10 @@ export const getSellerStats = createServerFn({ method: "GET" }).handler(() =>
         createdAt: schema.orders.createdAt,
       })
       .from(schema.orders)
-      .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
+      .innerJoin(
+        schema.orderItems,
+        eq(schema.orderItems.orderId, schema.orders.id)
+      )
       .where(eq(schema.orderItems.shopId, shop.id))
       .orderBy(desc(schema.orders.createdAt), schema.orders.id)
       .limit(8)
@@ -262,6 +310,5 @@ export const getSellerStats = createServerFn({ method: "GET" }).handler(() =>
       ordersPerDay,
       recentOrders,
     }
-  }),
+  })
 )
-

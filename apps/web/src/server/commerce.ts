@@ -8,19 +8,9 @@ import {
   sendPaymentReceivedEmail,
 } from "@ecommerce/email"
 import type { OrderEmailItem } from "@ecommerce/email"
-import {
-  AppError,
-  guard,
-  requireRole,
-  requireUser,
-} from "./session"
-import {
-  canCancel,
-  canMarkPaid,
-  canTransition
-  
-} from "@/lib/order-machine"
-import type {OrderStatus} from "@/lib/order-machine";
+import { AppError, guard, requireRole, requireUser } from "./session"
+import { canCancel, canMarkPaid, canTransition } from "@/lib/order-machine"
+import type { OrderStatus } from "@/lib/order-machine"
 
 // ─── Cart ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +48,10 @@ async function loadCartItems(cartId: string) {
   return db
     .select(cartItemColumns)
     .from(schema.cartItems)
-    .innerJoin(schema.products, eq(schema.cartItems.productId, schema.products.id))
+    .innerJoin(
+      schema.products,
+      eq(schema.cartItems.productId, schema.products.id)
+    )
     .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
     .where(eq(schema.cartItems.cartId, cartId))
     .orderBy(desc(schema.cartItems.createdAt))
@@ -71,14 +64,18 @@ export const getCart = createServerFn({ method: "GET" }).handler(() =>
     const items = await loadCartItems(cart.id)
     const subtotalCents = items.reduce(
       (sum, i) => sum + i.priceCents * i.quantity,
-      0,
+      0
     )
-    return { items, subtotalCents, count: items.reduce((n, i) => n + i.quantity, 0) }
-  }),
+    return {
+      items,
+      subtotalCents,
+      count: items.reduce((n, i) => n + i.quantity, 0),
+    }
+  })
 )
 
-const cartTarget = createServerFn({ method: "POST" })
-  .validator((input: unknown) => {
+const cartTarget = createServerFn({ method: "POST" }).validator(
+  (input: unknown) => {
     const raw = input as { productId?: unknown; quantity?: unknown }
     const productId = String(raw.productId ?? "")
     const quantity = Number(raw.quantity ?? 1)
@@ -87,7 +84,8 @@ const cartTarget = createServerFn({ method: "POST" })
       throw new AppError("INVALID", "Quantity must be 1–999")
     }
     return { productId, quantity }
-  })
+  }
+)
 
 export const addToCart = cartTarget.handler(({ data }) =>
   guard(async () => {
@@ -104,7 +102,11 @@ export const addToCart = cartTarget.handler(({ data }) =>
       .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
       .where(eq(schema.products.id, data.productId))
       .limit(1)
-    if (!product || product.status !== "active" || product.shopStatus !== "active") {
+    if (
+      !product ||
+      product.status !== "active" ||
+      product.shopStatus !== "active"
+    ) {
       throw new AppError("NOT_FOUND", "This product is not available")
     }
 
@@ -115,15 +117,15 @@ export const addToCart = cartTarget.handler(({ data }) =>
       .where(
         and(
           eq(schema.cartItems.cartId, cart.id),
-          eq(schema.cartItems.productId, product.id),
-        ),
+          eq(schema.cartItems.productId, product.id)
+        )
       )
       .limit(1)
     const requested = (existing?.quantity ?? 0) + data.quantity
     if (requested > product.stock) {
       throw new AppError(
         "OUT_OF_STOCK",
-        `Only ${product.stock} left of "${product.title}"`,
+        `Only ${product.stock} left of "${product.title}"`
       )
     }
     if (existing) {
@@ -134,31 +136,42 @@ export const addToCart = cartTarget.handler(({ data }) =>
     } else {
       await db
         .insert(schema.cartItems)
-        .values({ cartId: cart.id, productId: product.id, quantity: data.quantity })
+        .values({
+          cartId: cart.id,
+          productId: product.id,
+          quantity: data.quantity,
+        })
     }
     const items = await loadCartItems(cart.id)
     return { count: items.reduce((n, i) => n + i.quantity, 0) }
-  }),
+  })
 )
 
-const cartItemTarget = createServerFn({ method: "POST" })
-  .validator((input: unknown) => {
+const cartItemTarget = createServerFn({ method: "POST" }).validator(
+  (input: unknown) => {
     const raw = input as { itemId?: unknown; quantity?: unknown }
     const itemId = String(raw.itemId ?? "")
     if (!itemId) throw new AppError("INVALID", "itemId required")
-    const quantity = raw.quantity === undefined ? undefined : Number(raw.quantity)
-    if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 0 || quantity > 999)) {
+    const quantity =
+      raw.quantity === undefined ? undefined : Number(raw.quantity)
+    if (
+      quantity !== undefined &&
+      (!Number.isInteger(quantity) || quantity < 0 || quantity > 999)
+    ) {
       throw new AppError("INVALID", "Invalid quantity")
     }
     return { itemId, quantity }
-  })
+  }
+)
 
 async function ownCartItem(userId: string, itemId: string) {
   const [row] = await db
     .select({ id: schema.cartItems.id, cartId: schema.cartItems.cartId })
     .from(schema.cartItems)
     .innerJoin(schema.carts, eq(schema.cartItems.cartId, schema.carts.id))
-    .where(and(eq(schema.cartItems.id, itemId), eq(schema.carts.userId, userId)))
+    .where(
+      and(eq(schema.cartItems.id, itemId), eq(schema.carts.userId, userId))
+    )
     .limit(1)
   if (!row) throw new AppError("NOT_FOUND", "Cart item not found")
   return row
@@ -176,11 +189,17 @@ export const updateCartItem = cartItemTarget.handler(({ data }) =>
       const [product] = await db
         .select({ stock: schema.products.stock, title: schema.products.title })
         .from(schema.cartItems)
-        .innerJoin(schema.products, eq(schema.cartItems.productId, schema.products.id))
+        .innerJoin(
+          schema.products,
+          eq(schema.cartItems.productId, schema.products.id)
+        )
         .where(eq(schema.cartItems.id, item.id))
         .limit(1)
       if (product && data.quantity > product.stock) {
-        throw new AppError("OUT_OF_STOCK", `Only ${product.stock} left of "${product.title}"`)
+        throw new AppError(
+          "OUT_OF_STOCK",
+          `Only ${product.stock} left of "${product.title}"`
+        )
       }
       await db
         .update(schema.cartItems)
@@ -189,7 +208,7 @@ export const updateCartItem = cartItemTarget.handler(({ data }) =>
     }
     const items = await loadCartItems(item.cartId)
     return { count: items.reduce((n, i) => n + i.quantity, 0) }
-  }),
+  })
 )
 
 export const removeCartItem = cartItemTarget.handler(({ data }) =>
@@ -199,7 +218,7 @@ export const removeCartItem = cartItemTarget.handler(({ data }) =>
     await db.delete(schema.cartItems).where(eq(schema.cartItems.id, item.id))
     const items = await loadCartItems(item.cartId)
     return { removed: true, count: items.reduce((n, i) => n + i.quantity, 0) }
-  }),
+  })
 )
 
 // ─── Addresses ──────────────────────────────────────────────────────────────
@@ -231,8 +250,11 @@ export const listAddresses = createServerFn({ method: "GET" }).handler(() =>
       .select()
       .from(schema.addresses)
       .where(eq(schema.addresses.userId, user.id))
-      .orderBy(desc(schema.addresses.isDefault), desc(schema.addresses.createdAt))
-  }),
+      .orderBy(
+        desc(schema.addresses.isDefault),
+        desc(schema.addresses.createdAt)
+      )
+  })
 )
 
 export const createAddress = createServerFn({ method: "POST" })
@@ -242,14 +264,14 @@ export const createAddress = createServerFn({ method: "POST" })
       const user = await requireUser()
       const hasDefault = await db.$count(
         schema.addresses,
-        eq(schema.addresses.userId, user.id),
+        eq(schema.addresses.userId, user.id)
       )
       const [row] = await db
         .insert(schema.addresses)
         .values({ ...data, userId: user.id, isDefault: hasDefault === 0 })
         .returning()
       return row
-    }),
+    })
   )
 
 export const setDefaultAddress = createServerFn({ method: "POST" })
@@ -269,10 +291,15 @@ export const setDefaultAddress = createServerFn({ method: "POST" })
         await tx
           .update(schema.addresses)
           .set({ isDefault: true })
-          .where(and(eq(schema.addresses.id, data.id), eq(schema.addresses.userId, user.id)))
+          .where(
+            and(
+              eq(schema.addresses.id, data.id),
+              eq(schema.addresses.userId, user.id)
+            )
+          )
       })
       return { ok: true }
-    }),
+    })
   )
 
 export const deleteAddress = createServerFn({ method: "POST" })
@@ -286,9 +313,14 @@ export const deleteAddress = createServerFn({ method: "POST" })
       const user = await requireUser()
       await db
         .delete(schema.addresses)
-        .where(and(eq(schema.addresses.id, data.id), eq(schema.addresses.userId, user.id)))
+        .where(
+          and(
+            eq(schema.addresses.id, data.id),
+            eq(schema.addresses.userId, user.id)
+          )
+        )
       return { deleted: true }
-    }),
+    })
   )
 
 // ─── Checkout ───────────────────────────────────────────────────────────────
@@ -310,7 +342,9 @@ function isUniqueViolation(err: unknown): boolean {
 
 export const placeOrder = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
-    const addressId = String((input as { addressId?: unknown })?.addressId ?? "")
+    const addressId = String(
+      (input as { addressId?: unknown })?.addressId ?? ""
+    )
     if (!addressId) throw new AppError("INVALID", "Choose a delivery address")
     return { addressId }
   })
@@ -321,14 +355,18 @@ export const placeOrder = createServerFn({ method: "POST" })
         .select()
         .from(schema.addresses)
         .where(
-          and(eq(schema.addresses.id, data.addressId), eq(schema.addresses.userId, user.id)),
+          and(
+            eq(schema.addresses.id, data.addressId),
+            eq(schema.addresses.userId, user.id)
+          )
         )
         .limit(1)
       if (!address) throw new AppError("NOT_FOUND", "Address not found")
 
       const cart = await ensureCart(user.id)
       const items = await loadCartItems(cart.id)
-      if (items.length === 0) throw new AppError("EMPTY_CART", "Your cart is empty")
+      if (items.length === 0)
+        throw new AppError("EMPTY_CART", "Your cart is empty")
 
       const env = getEnv()
       const shippingFeeCents = env.SHIPPING_FEE_CENTS
@@ -349,15 +387,26 @@ export const placeOrder = createServerFn({ method: "POST" })
           })
           .from(schema.products)
           .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
-          .where(inArray(schema.products.id, items.map((i) => i.productId)))
+          .where(
+            inArray(
+              schema.products.id,
+              items.map((i) => i.productId)
+            )
+          )
         const byProduct = new Map(availability.map((a) => [a.productId, a]))
         for (const item of items) {
           const a = byProduct.get(item.productId)
           if (!a || a.status !== "active") {
-            throw new AppError("UNAVAILABLE", `"${item.title}" is no longer available — remove it from your cart`)
+            throw new AppError(
+              "UNAVAILABLE",
+              `"${item.title}" is no longer available — remove it from your cart`
+            )
           }
           if (a.shopStatus !== "active") {
-            throw new AppError("UNAVAILABLE", `Shop "${a.shopName}" is currently unavailable — remove its items from your cart`)
+            throw new AppError(
+              "UNAVAILABLE",
+              `Shop "${a.shopName}" is currently unavailable — remove its items from your cart`
+            )
           }
         }
 
@@ -370,14 +419,14 @@ export const placeOrder = createServerFn({ method: "POST" })
               and(
                 eq(schema.products.id, item.productId),
                 eq(schema.products.status, "active"),
-                gte(schema.products.stock, item.quantity),
-              ),
+                gte(schema.products.stock, item.quantity)
+              )
             )
             .returning({ id: schema.products.id })
           if (updated.length === 0) {
             throw new AppError(
               "OUT_OF_STOCK",
-              `"${item.title}" only has ${item.stock} left — adjust your cart`,
+              `"${item.title}" only has ${item.stock} left — adjust your cart`
             )
           }
           const totalCents = item.priceCents * item.quantity
@@ -403,37 +452,42 @@ export const placeOrder = createServerFn({ method: "POST" })
               .insert(schema.orders)
               .values({
                 orderNumber: orderNumber(),
-            buyerId: user.id,
-            status: "pending",
-            paymentMethod: "cod",
-            paymentStatus: "unpaid",
-            subtotalCents,
-            shippingFeeCents,
-            totalCents: subtotalCents + shippingFeeCents,
-            currency,
-            shipName: address.fullName,
-            shipPhone: address.phone,
-            shipLine1: address.line1,
-            shipLine2: address.line2,
-            shipCity: address.city,
-            shipState: address.state,
-            shipPostalCode: address.postalCode,
+                buyerId: user.id,
+                status: "pending",
+                paymentMethod: "cod",
+                paymentStatus: "unpaid",
+                subtotalCents,
+                shippingFeeCents,
+                totalCents: subtotalCents + shippingFeeCents,
+                currency,
+                shipName: address.fullName,
+                shipPhone: address.phone,
+                shipLine1: address.line1,
+                shipLine2: address.line2,
+                shipCity: address.city,
+                shipState: address.state,
+                shipPostalCode: address.postalCode,
                 shipCountry: address.country,
               })
               .returning()
             break
           } catch (err) {
             if (isUniqueViolation(err) && attempt === 2) {
-              throw new AppError("INTERNAL", "Could not allocate an order number — please retry")
+              throw new AppError(
+                "INTERNAL",
+                "Could not allocate an order number — please retry"
+              )
             }
             if (!isUniqueViolation(err)) throw err
           }
         }
 
-        await tx.insert(schema.orderItems).values(
-          orderItems.map((i) => ({ ...i, orderId: order.id })),
-        )
-        await tx.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cart.id))
+        await tx
+          .insert(schema.orderItems)
+          .values(orderItems.map((i) => ({ ...i, orderId: order.id })))
+        await tx
+          .delete(schema.cartItems)
+          .where(eq(schema.cartItems.cartId, cart.id))
         return order
       })
 
@@ -483,7 +537,7 @@ export const placeOrder = createServerFn({ method: "POST" })
         orderNumber: result.orderNumber,
         totalCents: result.totalCents,
       }
-    }),
+    })
   )
 
 // ─── Orders: buyer view ─────────────────────────────────────────────────────
@@ -508,7 +562,7 @@ export const listMyOrders = createServerFn({ method: "GET" }).handler(() =>
       .where(eq(schema.orders.buyerId, user.id))
       .orderBy(desc(schema.orders.createdAt))
       .limit(50)
-  }),
+  })
 )
 
 export const getMyOrder = createServerFn({ method: "GET" })
@@ -523,7 +577,9 @@ export const getMyOrder = createServerFn({ method: "GET" })
       const [order] = await db
         .select()
         .from(schema.orders)
-        .where(and(eq(schema.orders.id, data.id), eq(schema.orders.buyerId, user.id)))
+        .where(
+          and(eq(schema.orders.id, data.id), eq(schema.orders.buyerId, user.id))
+        )
         .limit(1)
       if (!order) throw new AppError("NOT_FOUND", "Order not found")
       const items = await db
@@ -539,7 +595,7 @@ export const getMyOrder = createServerFn({ method: "GET" })
         .from(schema.orderItems)
         .where(eq(schema.orderItems.orderId, order.id))
       return { order, items }
-    }),
+    })
   )
 
 // ─── Orders: seller & admin ─────────────────────────────────────────────────
@@ -570,13 +626,16 @@ export const listShopOrders = createServerFn({ method: "GET" }).handler(() =>
         buyerName: schema.users.name,
       })
       .from(schema.orders)
-      .innerJoin(schema.orderItems, eq(schema.orderItems.orderId, schema.orders.id))
+      .innerJoin(
+        schema.orderItems,
+        eq(schema.orderItems.orderId, schema.orders.id)
+      )
       .innerJoin(schema.users, eq(schema.orders.buyerId, schema.users.id))
       .where(eq(schema.orderItems.shopId, shopId))
       .orderBy(desc(schema.orders.createdAt), schema.orders.id)
       .limit(100)
     return rows
-  }),
+  })
 )
 
 export const listAllOrders = createServerFn({ method: "GET" }).handler(() =>
@@ -597,7 +656,7 @@ export const listAllOrders = createServerFn({ method: "GET" }).handler(() =>
       .innerJoin(schema.users, eq(schema.orders.buyerId, schema.users.id))
       .orderBy(desc(schema.orders.createdAt))
       .limit(100)
-  }),
+  })
 )
 
 export const getOrderDetail = createServerFn({ method: "GET" })
@@ -609,10 +668,17 @@ export const getOrderDetail = createServerFn({ method: "GET" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, data.id)).limit(1)
+      const [order] = await db
+        .select()
+        .from(schema.orders)
+        .where(eq(schema.orders.id, data.id))
+        .limit(1)
       if (!order) throw new AppError("NOT_FOUND", "Order not found")
 
-      let items = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, order.id))
+      let items = await db
+        .select()
+        .from(schema.orderItems)
+        .where(eq(schema.orderItems.orderId, order.id))
       const shopIds = [...new Set(items.map((i) => i.shopId))]
 
       if (user.role === "seller") {
@@ -623,19 +689,27 @@ export const getOrderDetail = createServerFn({ method: "GET" })
           .where(eq(schema.shops.ownerId, user.id))
           .limit(1)
         items = shop ? items.filter((i) => i.shopId === shop.id) : []
-        if (items.length === 0) throw new AppError("FORBIDDEN", "Not your order")
+        if (items.length === 0)
+          throw new AppError("FORBIDDEN", "Not your order")
       } else if (user.role === "buyer" && order.buyerId !== user.id) {
         throw new AppError("FORBIDDEN", "Not your order")
       }
 
       return { order, items, shopIds, viewer: { id: user.id, role: user.role } }
-    }),
+    })
   )
 
 // ─── Order actions ──────────────────────────────────────────────────────────
 
-async function loadOrderForAction(orderId: string, viewer: { id: string; role: string }) {
-  const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1)
+async function loadOrderForAction(
+  orderId: string,
+  viewer: { id: string; role: string }
+) {
+  const [order] = await db
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.id, orderId))
+    .limit(1)
   if (!order) throw new AppError("NOT_FOUND", "Order not found")
   const items = await db
     .select({ shopId: schema.orderItems.shopId })
@@ -658,50 +732,101 @@ async function loadOrderForAction(orderId: string, viewer: { id: string; role: s
   return { order, shopIds, viewerShopId }
 }
 
-async function orderEmails(orderId: string, kind: "status" | "paid" | "cancelled", extra?: { status?: OrderStatus; reason?: string | null }) {
-  const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId)).limit(1)
+async function orderEmails(
+  orderId: string,
+  kind: "status" | "paid" | "cancelled",
+  extra?: { status?: OrderStatus; reason?: string | null }
+) {
+  const [order] = await db
+    .select()
+    .from(schema.orders)
+    .where(eq(schema.orders.id, orderId))
+    .limit(1)
   if (!order) return
-  const [buyer] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, order.buyerId)).limit(1)
+  const [buyer] = await db
+    .select({ email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, order.buyerId))
+    .limit(1)
   if (!buyer) return
   const totalFormatted = formatMoney(order.totalCents, order.currency)
   if (kind === "status" && extra?.status) {
     void sendOrderStatusEmail(buyer.email, order.orderNumber, extra.status)
   } else if (kind === "paid") {
-    void sendPaymentReceivedEmail(buyer.email, order.orderNumber, totalFormatted)
+    void sendPaymentReceivedEmail(
+      buyer.email,
+      order.orderNumber,
+      totalFormatted
+    )
   } else if (kind === "cancelled") {
-    void sendOrderCancelledEmail(buyer.email, order.orderNumber, extra?.reason ?? null)
+    void sendOrderCancelledEmail(
+      buyer.email,
+      order.orderNumber,
+      extra?.reason ?? null
+    )
   }
 }
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
-    const raw = input as { orderId?: unknown; status?: unknown; reason?: unknown }
+    const raw = input as {
+      orderId?: unknown
+      status?: unknown
+      reason?: unknown
+    }
     const orderId = String(raw.orderId ?? "")
     const status = String(raw.status ?? "") as OrderStatus
     if (!orderId) throw new AppError("INVALID", "orderId required")
-    if (!["pending", "confirmed", "shipped", "delivered", "cancelled"].includes(status)) {
+    if (
+      !["pending", "confirmed", "shipped", "delivered", "cancelled"].includes(
+        status
+      )
+    ) {
       throw new AppError("INVALID", "Invalid status")
     }
-    return { orderId, status, reason: raw.reason ? String(raw.reason).slice(0, 300) : null }
+    return {
+      orderId,
+      status,
+      reason: raw.reason ? String(raw.reason).slice(0, 300) : null,
+    }
   })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const { order, shopIds, viewerShopId } = await loadOrderForAction(data.orderId, user)
+      const { order, shopIds, viewerShopId } = await loadOrderForAction(
+        data.orderId,
+        user
+      )
       const viewer = { id: user.id, role: user.role, shopId: viewerShopId }
 
       if (data.status === "cancelled") {
-        if (!canCancel({ status: order.status, buyerId: order.buyerId, shopIds }, viewer)) {
-          throw new AppError("FORBIDDEN", "You cannot cancel this order at its current stage")
+        if (
+          !canCancel(
+            { status: order.status, buyerId: order.buyerId, shopIds },
+            viewer
+          )
+        ) {
+          throw new AppError(
+            "FORBIDDEN",
+            "You cannot cancel this order at its current stage"
+          )
         }
-        if (!data.reason) throw new AppError("INVALID", "A cancellation reason is required")
+        if (!data.reason)
+          throw new AppError("INVALID", "A cancellation reason is required")
         await db.transaction(async (tx) => {
           await tx
             .update(schema.orders)
-            .set({ status: "cancelled", paymentStatus: "void", cancelReason: data.reason })
+            .set({
+              status: "cancelled",
+              paymentStatus: "void",
+              cancelReason: data.reason,
+            })
             .where(eq(schema.orders.id, order.id))
           const items = await tx
-            .select({ productId: schema.orderItems.productId, quantity: schema.orderItems.quantity })
+            .select({
+              productId: schema.orderItems.productId,
+              quantity: schema.orderItems.quantity,
+            })
             .from(schema.orderItems)
             .where(eq(schema.orderItems.orderId, order.id))
           for (const item of items) {
@@ -716,7 +841,10 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       }
 
       if (!canTransition(order.status, data.status)) {
-        throw new AppError("INVALID", `Cannot move an order from ${order.status} to ${data.status}`)
+        throw new AppError(
+          "INVALID",
+          `Cannot move an order from ${order.status} to ${data.status}`
+        )
       }
       await db
         .update(schema.orders)
@@ -724,7 +852,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
         .where(eq(schema.orders.id, order.id))
       void orderEmails(order.id, "status", { status: data.status })
       return { status: data.status }
-    }),
+    })
   )
 
 export const markOrderPaid = createServerFn({ method: "POST" })
@@ -736,7 +864,10 @@ export const markOrderPaid = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const { order, viewerShopId } = await loadOrderForAction(data.orderId, user)
+      const { order, viewerShopId } = await loadOrderForAction(
+        data.orderId,
+        user
+      )
       if (
         !canMarkPaid(order.status, order.paymentStatus, {
           id: user.id,
@@ -744,7 +875,10 @@ export const markOrderPaid = createServerFn({ method: "POST" })
           shopId: viewerShopId,
         })
       ) {
-        throw new AppError("INVALID", "Payment can be marked after delivery (cash collected by hand)")
+        throw new AppError(
+          "INVALID",
+          "Payment can be marked after delivery (cash collected by hand)"
+        )
       }
       await db
         .update(schema.orders)
@@ -752,5 +886,5 @@ export const markOrderPaid = createServerFn({ method: "POST" })
         .where(eq(schema.orders.id, order.id))
       void orderEmails(order.id, "paid")
       return { paymentStatus: "paid" as const }
-    }),
+    })
   )

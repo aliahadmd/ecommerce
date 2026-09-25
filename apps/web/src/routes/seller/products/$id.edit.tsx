@@ -5,8 +5,8 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { centsToDecimalString } from "@ecommerce/config"
 import { getProductForEdit, updateProduct } from "@/server/catalog"
-import { ProductForm  } from "@/components/product-form"
-import type {ProductFormValues} from "@/components/product-form";
+import { ProductForm } from "@/components/product-form"
+import type { ProductFormValues } from "@/components/product-form"
 import { ImageUploader } from "@/components/image-uploader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -33,7 +33,7 @@ function EditProductPage() {
     queryFn: () => getProductForEdit({ data: { id } }).then(unwrap),
   })
   if (isError) {
-    return <p className="text-destructive py-8">{(error).message}</p>
+    return <p className="py-8 text-destructive">{error.message}</p>
   }
 
   async function onSubmit(values: ProductFormValues) {
@@ -46,7 +46,9 @@ function EditProductPage() {
     }
     toast.success("Product saved")
     void queryClient.invalidateQueries({ queryKey: ["seller-products"] })
-    void queryClient.invalidateQueries({ queryKey: ["product", result.data.slug] })
+    void queryClient.invalidateQueries({
+      queryKey: ["product", result.data.slug],
+    })
     await navigate({ to: "/seller/products", search: { page: 1 } })
   }
 

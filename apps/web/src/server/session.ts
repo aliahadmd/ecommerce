@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start"
 import { getRequest } from "@tanstack/react-start/server"
 import { auth } from "@ecommerce/auth"
-import { ok, fail  } from "@ecommerce/config"
-import type {Result} from "@ecommerce/config";
+import { ok, fail } from "@ecommerce/config"
+import type { Result } from "@ecommerce/config"
 
 export type Role = "super_admin" | "seller" | "buyer"
 
@@ -19,7 +19,7 @@ export type AppUser = {
 export class AppError extends Error {
   constructor(
     public code: string,
-    message: string,
+    message: string
   ) {
     super(message)
   }
@@ -53,7 +53,7 @@ export const getSession = createServerFn({ method: "GET" }).handler(
       emailVerified: u.emailVerified,
       image: u.image ?? null,
     }
-  },
+  }
 )
 
 export async function requireUser(): Promise<AppUser> {

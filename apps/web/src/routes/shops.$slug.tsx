@@ -38,7 +38,9 @@ function ShopPage() {
         <CardContent className="py-6">
           <h1 className="text-xl font-semibold">{shop.name}</h1>
           {shop.description && (
-            <p className="text-muted-foreground mt-1 text-sm">{shop.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {shop.description}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -48,7 +50,7 @@ function ShopPage() {
         ))}
       </div>
       {items.length === 0 && (
-        <p className="text-muted-foreground py-16 text-center text-sm">
+        <p className="py-16 text-center text-sm text-muted-foreground">
           This shop has no active products yet.
         </p>
       )}

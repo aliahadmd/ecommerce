@@ -7,16 +7,14 @@
  * All dev defaults match docker-compose.yml so a fresh clone works with
  * `make env && make up && make dev`.
  */
-import { z } from "zod"
+import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3000),
 
   // Postgres (pgvector container in dev)
-  DATABASE_URL: z
-    .string()
-    .default("postgres://ecommerce:ecommerce@localhost:5432/ecommerce"),
+  DATABASE_URL: z.string().default("postgres://ecommerce:ecommerce@localhost:5432/ecommerce"),
 
   // Redis
   REDIS_URL: z.string().default("redis://localhost:6379"),
@@ -37,9 +35,7 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default("Ecommerce <no-reply@dev.local>"),
 
   // Auth
-  BETTER_AUTH_SECRET: z
-    .string()
-    .default("dev-secret-change-me-0123456789abcdef0123456789abcdef"),
+  BETTER_AUTH_SECRET: z.string().default("dev-secret-change-me-0123456789abcdef0123456789abcdef"),
   BETTER_AUTH_URL: z.string().default("http://localhost:3000"),
 
   // Seed
@@ -54,9 +50,9 @@ const envSchema = z.object({
   // Commerce
   CURRENCY: z.string().length(3).default("USD"),
   SHIPPING_FEE_CENTS: z.coerce.number().default(0),
-})
+});
 
-export type Env = z.infer<typeof envSchema>
+export type Env = z.infer<typeof envSchema>;
 
 /**
  * In production these MUST be provided explicitly (no compiled-in defaults,
@@ -73,46 +69,44 @@ const PROD_REQUIRED = [
   "SMTP_HOST",
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
-] as const
+] as const;
 
 const PROD_FORBIDDEN_DEFAULTS: Partial<Record<(typeof PROD_REQUIRED)[number], string>> = {
   BETTER_AUTH_SECRET: "dev-secret-change-me-0123456789abcdef0123456789abcdef",
   S3_ACCESS_KEY: "ecommerce-dev",
   S3_SECRET_KEY: "ecommerce-dev-secret",
   DATABASE_URL: "postgres://ecommerce:ecommerce@localhost:5432/ecommerce",
-}
+};
 
 function assertProductionEnv(): void {
-  const missing = PROD_REQUIRED.filter((key) => !process.env[key])
-  const problems: string[] = []
+  const missing = PROD_REQUIRED.filter((key) => !process.env[key]);
+  const problems: string[] = [];
   if (missing.length > 0) {
-    problems.push(`missing required variables:\n  - ${missing.join("\n  - ")}`)
+    problems.push(`missing required variables:\n  - ${missing.join("\n  - ")}`);
   }
   const devDefaults = PROD_REQUIRED.filter(
-    (key) =>
-      process.env[key] !== undefined &&
-      process.env[key] === PROD_FORBIDDEN_DEFAULTS[key],
-  )
+    (key) => process.env[key] !== undefined && process.env[key] === PROD_FORBIDDEN_DEFAULTS[key],
+  );
   if (devDefaults.length > 0) {
-    problems.push(`dev defaults are not allowed in production:\n  - ${devDefaults.join("\n  - ")}`)
+    problems.push(`dev defaults are not allowed in production:\n  - ${devDefaults.join("\n  - ")}`);
   }
   if (problems.length > 0) {
-    throw new Error(`Production environment misconfigured:\n${problems.join("\n")}`)
+    throw new Error(`Production environment misconfigured:\n${problems.join("\n")}`);
   }
 }
 
-let cached: Env | null = null
+let cached: Env | null = null;
 
 export function getEnv(): Env {
-  if (cached) return cached
-  const result = envSchema.safeParse(process.env)
+  if (cached) return cached;
+  const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const details = result.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
-      .join("\n")
-    throw new Error(`Invalid environment configuration:\n${details}`)
+      .join("\n");
+    throw new Error(`Invalid environment configuration:\n${details}`);
   }
-  if (result.data.NODE_ENV === "production") assertProductionEnv()
-  cached = result.data
-  return cached
+  if (result.data.NODE_ENV === "production") assertProductionEnv();
+  cached = result.data;
+  return cached;
 }

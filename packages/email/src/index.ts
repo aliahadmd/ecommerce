@@ -1,51 +1,50 @@
-import nodemailer from "nodemailer"
-import { getEnv } from "@ecommerce/config"
+import nodemailer from "nodemailer";
+import { getEnv } from "@ecommerce/config";
 
 /**
  * Dev email goes to Mailpit (SMTP :1025, UI :8025). In production only the
  * SMTP_* env vars change — templates and call sites stay identical.
  */
 
-let transport: nodemailer.Transporter | null = null
+let transport: nodemailer.Transporter | null = null;
 
 function getTransport(): nodemailer.Transporter {
   if (!transport) {
-    const env = getEnv()
+    const env = getEnv();
     transport = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
       auth:
-        env.SMTP_USER && env.SMTP_PASS
-          ? { user: env.SMTP_USER, pass: env.SMTP_PASS }
-          : undefined,
-    })
+        env.SMTP_USER && env.SMTP_PASS ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+    });
   }
-  return transport
+  return transport;
 }
 
 async function sendMail(options: {
-  to: string
-  subject: string
-  html: string
-  text: string
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
 }): Promise<void> {
-  const env = getEnv()
+  const env = getEnv();
   try {
     await getTransport().sendMail({
       from: env.EMAIL_FROM,
       ...options,
-    })
+    });
   } catch (err) {
     // Emails must never break a user flow (checkout, signup…); log and move on.
-    console.error("[email] failed to send:", options.subject, err)
+    console.error("[email] failed to send:", options.subject, err);
   }
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  )
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+  );
 }
 
 function layout(title: string, bodyHtml: string): string {
@@ -59,18 +58,15 @@ function layout(title: string, bodyHtml: string): string {
       ${getEnv().NODE_ENV === "production" ? "" : '<p style="color:#71717a;font-size:12px;margin-top:32px">Sent by your local dev environment — view all mail at http://localhost:8025</p>'}
     </div>
   </body>
-</html>`
+</html>`;
 }
 
 function button(url: string, label: string): string {
   return `<p><a href="${url}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">${label}</a></p>
-  <p style="font-size:12px;color:#71717a;word-break:break-all">Or paste this link: ${url}</p>`
+  <p style="font-size:12px;color:#71717a;word-break:break-all">Or paste this link: ${url}</p>`;
 }
 
-export async function sendVerificationEmail(
-  to: string,
-  url: string,
-): Promise<void> {
+export async function sendVerificationEmail(to: string, url: string): Promise<void> {
   await sendMail({
     to,
     subject: "Verify your email",
@@ -79,13 +75,10 @@ export async function sendVerificationEmail(
       `<p>Welcome! Please confirm your email address to activate your account.</p>${button(url, "Verify email")}`,
     ),
     text: `Verify your email: ${url}`,
-  })
+  });
 }
 
-export async function sendPasswordResetEmail(
-  to: string,
-  url: string,
-): Promise<void> {
+export async function sendPasswordResetEmail(to: string, url: string): Promise<void> {
   await sendMail({
     to,
     subject: "Reset your password",
@@ -94,20 +87,20 @@ export async function sendPasswordResetEmail(
       `<p>We received a request to reset your password. If this wasn't you, ignore this email.</p>${button(url, "Reset password")}`,
     ),
     text: `Reset your password: ${url}`,
-  })
+  });
 }
 
 export interface OrderEmailItem {
-  title: string
-  quantity: number
-  totalFormatted: string
+  title: string;
+  quantity: number;
+  totalFormatted: string;
 }
 
 export interface OrderEmailData {
-  orderNumber: string
-  items: OrderEmailItem[]
-  totalFormatted: string
-  shipAddress: string
+  orderNumber: string;
+  items: OrderEmailItem[];
+  totalFormatted: string;
+  shipAddress: string;
 }
 
 function itemsTable(data: OrderEmailData): string {
@@ -116,17 +109,14 @@ function itemsTable(data: OrderEmailData): string {
       (i) =>
         `<tr><td style="padding:6px 0">${escapeHtml(i.title)} × ${i.quantity}</td><td style="text-align:right">${escapeHtml(i.totalFormatted)}</td></tr>`,
     )
-    .join("")
+    .join("");
   return `<table style="width:100%;border-collapse:collapse;font-size:14px">${rows}
     <tr><td style="padding-top:8px;border-top:1px solid #e4e4e7"><strong>Total (cash on delivery)</strong></td>
     <td style="text-align:right;border-top:1px solid #e4e4e7"><strong>${data.totalFormatted}</strong></td></tr></table>
-    <p style="font-size:14px">Deliver to: ${escapeHtml(data.shipAddress)}</p>`
+    <p style="font-size:14px">Deliver to: ${escapeHtml(data.shipAddress)}</p>`;
 }
 
-export async function sendOrderPlacedEmail(
-  to: string,
-  data: OrderEmailData,
-): Promise<void> {
+export async function sendOrderPlacedEmail(to: string, data: OrderEmailData): Promise<void> {
   await sendMail({
     to,
     subject: `Order ${data.orderNumber} placed`,
@@ -135,7 +125,7 @@ export async function sendOrderPlacedEmail(
       `<p>Thanks for your order! Payment is cash on delivery — have ${data.totalFormatted} ready.</p>${itemsTable(data)}`,
     ),
     text: `Order ${data.orderNumber} placed. Total ${data.totalFormatted} (cash on delivery).`,
-  })
+  });
 }
 
 export async function sendOrderStatusEmail(
@@ -151,7 +141,7 @@ export async function sendOrderStatusEmail(
       `<p>Your order status changed to <strong>${escapeHtml(status)}</strong>.</p>`,
     ),
     text: `Order ${orderNumber} status: ${status}`,
-  })
+  });
 }
 
 export async function sendPaymentReceivedEmail(
@@ -167,7 +157,7 @@ export async function sendPaymentReceivedEmail(
       `<p>We've marked your cash payment of <strong>${totalFormatted}</strong> as received. Thank you!</p>`,
     ),
     text: `Payment of ${totalFormatted} received for order ${orderNumber}.`,
-  })
+  });
 }
 
 export async function sendOrderCancelledEmail(
@@ -183,5 +173,5 @@ export async function sendOrderCancelledEmail(
       `<p>Your order was cancelled${reason ? ` — reason: ${escapeHtml(reason)}` : ""}. Any reserved stock has been returned.</p>`,
     ),
     text: `Order ${orderNumber} cancelled${reason ? `: ${reason}` : ""}.`,
-  })
+  });
 }

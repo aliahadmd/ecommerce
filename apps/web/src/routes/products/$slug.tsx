@@ -33,7 +33,8 @@ function ProductDetailPage() {
   const navigate = useNavigate()
   const [quantity, setQuantity] = useState(1)
   const add = useMutation({
-    mutationFn: (qty: number) => addToCart({ data: { productId: product.id, quantity: qty } }),
+    mutationFn: (qty: number) =>
+      addToCart({ data: { productId: product.id, quantity: qty } }),
     onSuccess: (r) => {
       if (!r.ok) {
         // Send unauthenticated visitors to login instead of a dead-end toast
@@ -51,17 +52,21 @@ function ProductDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["cart"] })
       toast.success("Added to cart")
     },
-    onError: (e) => toast.error((e).message),
+    onError: (e) => toast.error(e.message),
   })
 
   if (isError) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-24 text-center">
         <h1 className="text-xl font-semibold">Product not found</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
+        <p className="mt-2 text-sm text-muted-foreground">
           It may have been unpublished or the link is wrong.
         </p>
-        <Button render={<Link to="/products" search={{}} />} className="mt-6" variant="outline">
+        <Button
+          render={<Link to="/products" search={{}} />}
+          className="mt-6"
+          variant="outline"
+        >
           Browse products
         </Button>
       </main>
@@ -85,10 +90,14 @@ function ProductDetailPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <nav className="text-muted-foreground mb-6 text-sm">
+      <nav className="mb-6 text-sm text-muted-foreground">
         {categorySlug && categoryName && (
           <>
-            <Link to="/products" search={{ category: categorySlug }} className="hover:underline">
+            <Link
+              to="/products"
+              search={{ category: categorySlug }}
+              className="hover:underline"
+            >
               {categoryName}
             </Link>
             <span className="mx-2">/</span>
@@ -99,18 +108,31 @@ function ProductDetailPage() {
 
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <div>
-          <div className="bg-muted aspect-square w-full overflow-hidden rounded-2xl">
+          <div className="aspect-square w-full overflow-hidden rounded-2xl bg-muted">
             {images[0] ? (
-              <img src={images[0].url} alt={images[0].alt ?? product.title} className="h-full w-full object-cover" />
+              <img
+                src={images[0].url}
+                alt={images[0].alt ?? product.title}
+                className="h-full w-full object-cover"
+              />
             ) : (
-              <div className="flex h-full items-center justify-center text-6xl">🛍️</div>
+              <div className="flex h-full items-center justify-center text-6xl">
+                🛍️
+              </div>
             )}
           </div>
           {images.length > 1 && (
             <div className="mt-3 grid grid-cols-5 gap-2">
               {images.slice(1, 6).map((img) => (
-                <div key={img.id} className="bg-muted aspect-square overflow-hidden rounded-lg">
-                  <img src={img.url} alt={img.alt ?? product.title} className="h-full w-full object-cover" />
+                <div
+                  key={img.id}
+                  className="aspect-square overflow-hidden rounded-lg bg-muted"
+                >
+                  <img
+                    src={img.url}
+                    alt={img.alt ?? product.title}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               ))}
             </div>
@@ -130,9 +152,13 @@ function ProductDetailPage() {
             )}
           </div>
 
-          <div className="text-muted-foreground mt-3 text-sm">
+          <div className="mt-3 text-sm text-muted-foreground">
             Sold by{" "}
-            <Link to="/shops/$slug" params={{ slug: shop.slug }} className="text-foreground font-medium hover:underline">
+            <Link
+              to="/shops/$slug"
+              params={{ slug: shop.slug }}
+              className="font-medium text-foreground hover:underline"
+            >
               {shop.name}
             </Link>
           </div>
@@ -158,13 +184,17 @@ function ProductDetailPage() {
               >
                 −
               </Button>
-              <span className="w-10 text-center text-sm font-medium">{quantity}</span>
+              <span className="w-10 text-center text-sm font-medium">
+                {quantity}
+              </span>
               <Button
                 variant="outline"
                 size="icon"
                 aria-label="Increase quantity"
                 disabled={product.stock === 0 || quantity >= product.stock}
-                onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
+                onClick={() =>
+                  setQuantity((q) => Math.min(product.stock, q + 1))
+                }
               >
                 +
               </Button>
@@ -178,7 +208,9 @@ function ProductDetailPage() {
           </div>
 
           <Separator className="my-6" />
-          <p className="text-sm leading-relaxed whitespace-pre-line">{product.description}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-line">
+            {product.description}
+          </p>
         </div>
       </div>
     </main>

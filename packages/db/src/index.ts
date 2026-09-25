@@ -1,5 +1,5 @@
-export { db, type Tx } from "./client"
-export * as schema from "./schema/index"
+export { db, type Tx } from "./client";
+export * as schema from "./schema/index";
 
 // Re-export the query-builder surface app code needs, so consumers depend on
 // @ecommerce/db only (single drizzle version, no direct dependency).
@@ -22,4 +22,4 @@ export {
   lt,
   isNull,
   isNotNull,
-} from "drizzle-orm"
+} from "drizzle-orm";

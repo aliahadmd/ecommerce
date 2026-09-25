@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router"
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -22,7 +27,9 @@ export const Route = createFileRoute("/login")({
 })
 
 function errMsg(e: unknown): string {
-  return typeof e === "string" ? e : (e as { message?: string })?.message ?? "Invalid"
+  return typeof e === "string"
+    ? e
+    : ((e as { message?: string })?.message ?? "Invalid")
 }
 
 function LoginPage() {
@@ -45,7 +52,11 @@ function LoginPage() {
       const session = await getSession()
       await router.invalidate()
       toast.success(`Welcome back, ${session?.name ?? ""}!`)
-      const target = redirect?.startsWith("/") ? redirect : session ? homeForRole(session.role) : "/"
+      const target = redirect?.startsWith("/")
+        ? redirect
+        : session
+          ? homeForRole(session.role)
+          : "/"
       await navigate({ href: target })
     },
   })
@@ -72,7 +83,12 @@ function LoginPage() {
           >
             <form.Field
               name="email"
-              validators={{ onChange: z.string().min(1, "Required").email("Enter a valid email") }}
+              validators={{
+                onChange: z
+                  .string()
+                  .min(1, "Required")
+                  .email("Enter a valid email"),
+              }}
             >
               {(field) => (
                 <div className="space-y-1.5">
@@ -86,7 +102,7 @@ function LoginPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
@@ -109,7 +125,7 @@ function LoginPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
@@ -120,7 +136,7 @@ function LoginPage() {
               Sign in
             </Button>
           </form>
-          <p className="text-muted-foreground mt-4 text-center text-xs">
+          <p className="mt-4 text-center text-xs text-muted-foreground">
             <Link to="/forgot-password" className="underline">
               Forgot your password?
             </Link>

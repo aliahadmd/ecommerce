@@ -11,7 +11,10 @@ const hostname = process.env.HOST || "0.0.0.0"
 
 const server = createServer(async (req, res) => {
   try {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`)
+    const url = new URL(
+      req.url ?? "/",
+      `http://${req.headers.host ?? "localhost"}`
+    )
     const body =
       req.method !== "GET" && req.method !== "HEAD"
         ? await new Promise((resolve, reject) => {

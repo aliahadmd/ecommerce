@@ -7,9 +7,11 @@ import { createStore, useStore } from "@tanstack/react-store"
 type Theme = "light" | "dark"
 
 export const themeStore = createStore<{ theme: Theme }>({
-  theme: typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light",
+  theme:
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light",
 })
 
 export function applyTheme(theme: Theme) {
@@ -18,7 +20,8 @@ export function applyTheme(theme: Theme) {
 
 export function initTheme() {
   const saved = localStorage.getItem("theme")
-  const theme: Theme = saved === "dark" || saved === "light" ? saved : themeStore.get().theme
+  const theme: Theme =
+    saved === "dark" || saved === "light" ? saved : themeStore.get().theme
   themeStore.setState(() => ({ theme }))
   applyTheme(theme)
 }

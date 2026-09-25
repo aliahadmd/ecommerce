@@ -1,7 +1,7 @@
-import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-import { users } from "./auth"
+import { pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { users } from "./auth";
 
-export const shopStatus = pgEnum("shop_status", ["active", "suspended"])
+export const shopStatus = pgEnum("shop_status", ["active", "suspended"]);
 
 /** One shop per seller (1:1 with the owner user). */
 export const shops = pgTable("shops", {
@@ -14,11 +14,9 @@ export const shops = pgTable("shops", {
   slug: text("slug").notNull().unique(),
   description: text("description"),
   status: shopStatus("status").notNull().default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-})
+});

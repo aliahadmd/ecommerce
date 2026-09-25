@@ -19,12 +19,12 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 })
 
-const passwordSchema = z
-  .string()
-  .min(8, "At least 8 characters")
+const passwordSchema = z.string().min(8, "At least 8 characters")
 
 function errMsg(e: unknown): string {
-  return typeof e === "string" ? e : (e as { message?: string })?.message ?? "Invalid"
+  return typeof e === "string"
+    ? e
+    : ((e as { message?: string })?.message ?? "Invalid")
 }
 
 function RegisterPage() {
@@ -57,7 +57,7 @@ function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               Dev environment: open the{" "}
               <a
                 href="http://localhost:8025"
@@ -69,7 +69,11 @@ function RegisterPage() {
               </a>{" "}
               and click the verification link.
             </p>
-            <Button render={<Link to="/login" />} variant="outline" className="w-full">
+            <Button
+              render={<Link to="/login" />}
+              variant="outline"
+              className="w-full"
+            >
               Back to sign in
             </Button>
           </CardContent>
@@ -113,7 +117,7 @@ function RegisterPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
@@ -122,7 +126,12 @@ function RegisterPage() {
             </form.Field>
             <form.Field
               name="email"
-              validators={{ onChange: z.string().min(1, "Required").email("Enter a valid email") }}
+              validators={{
+                onChange: z
+                  .string()
+                  .min(1, "Required")
+                  .email("Enter a valid email"),
+              }}
             >
               {(field) => (
                 <div className="space-y-1.5">
@@ -136,14 +145,17 @@ function RegisterPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
                 </div>
               )}
             </form.Field>
-            <form.Field name="password" validators={{ onChange: passwordSchema }}>
+            <form.Field
+              name="password"
+              validators={{ onChange: passwordSchema }}
+            >
               {(field) => (
                 <div className="space-y-1.5">
                   <Label htmlFor="password">Password</Label>
@@ -155,11 +167,11 @@ function RegisterPage() {
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-xs text-muted-foreground">
                     At least 8 characters
                   </p>
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}

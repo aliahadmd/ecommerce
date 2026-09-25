@@ -21,10 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const stockSchema = z
-  .string()
-  .min(1, "Required")
-  .regex(/^\d+$/, "Whole number")
+const stockSchema = z.string().min(1, "Required").regex(/^\d+$/, "Whole number")
 
 const productFormSchema = z.object({
   title: z.string().min(3).max(200),
@@ -47,7 +44,9 @@ export interface ProductFormValues {
 }
 
 function errMsg(e: unknown): string {
-  return typeof e === "string" ? e : (e as { message?: string })?.message ?? "Invalid"
+  return typeof e === "string"
+    ? e
+    : ((e as { message?: string })?.message ?? "Invalid")
 }
 
 /** Shared between the create and edit pages (plan-7). */
@@ -78,8 +77,11 @@ export function ProductForm({
   const [suggestions, setSuggestions] = useState<string[]>([])
 
   const genDesc = useMutation({
-    mutationFn: (values: { title: string; categoryName: string | null; tagNames: string[] }) =>
-      generateDescription({ data: values }),
+    mutationFn: (values: {
+      title: string
+      categoryName: string | null
+      tagNames: string[]
+    }) => generateDescription({ data: values }),
     onSuccess: (r) => {
       if (!r.ok) {
         toast.error(r.error.message)
@@ -88,7 +90,7 @@ export function ProductForm({
       form.setFieldValue("description", r.data.description)
       toast.success("Description generated — review and edit")
     },
-    onError: (e) => toast.error((e).message),
+    onError: (e) => toast.error(e.message),
   })
   const genTags = useMutation({
     mutationFn: (values: { title: string; description: string }) =>
@@ -101,7 +103,7 @@ export function ProductForm({
       setSuggestions(r.data.suggestions)
       if (r.data.suggestions.length === 0) toast.info("No tag suggestions")
     },
-    onError: (e) => toast.error((e).message),
+    onError: (e) => toast.error(e.message),
   })
 
   const form = useForm({
@@ -129,7 +131,9 @@ export function ProductForm({
     >
       <form.Field
         name="title"
-        validators={{ onChange: z.string().min(3, "At least 3 characters").max(200) }}
+        validators={{
+          onChange: z.string().min(3, "At least 3 characters").max(200),
+        }}
       >
         {(field) => (
           <div className="space-y-1.5">
@@ -141,13 +145,18 @@ export function ProductForm({
               onChange={(e) => field.handleChange(e.target.value)}
             />
             {field.state.meta.errors.length > 0 && (
-              <p className="text-destructive text-xs">{errMsg(field.state.meta.errors[0])}</p>
+              <p className="text-xs text-destructive">
+                {errMsg(field.state.meta.errors[0])}
+              </p>
             )}
           </div>
         )}
       </form.Field>
 
-      <form.Field name="price" validators={{ onChange: productFormSchema.shape.price }}>
+      <form.Field
+        name="price"
+        validators={{ onChange: productFormSchema.shape.price }}
+      >
         {(field) => (
           <div className="space-y-1.5">
             <Label htmlFor="price">Price (USD)</Label>
@@ -160,7 +169,9 @@ export function ProductForm({
               onChange={(e) => field.handleChange(e.target.value)}
             />
             {field.state.meta.errors.length > 0 && (
-              <p className="text-destructive text-xs">{errMsg(field.state.meta.errors[0])}</p>
+              <p className="text-xs text-destructive">
+                {errMsg(field.state.meta.errors[0])}
+              </p>
             )}
           </div>
         )}
@@ -179,7 +190,9 @@ export function ProductForm({
               onChange={(e) => field.handleChange(e.target.value)}
             />
             {field.state.meta.errors.length > 0 && (
-              <p className="text-destructive text-xs">{errMsg(field.state.meta.errors[0])}</p>
+              <p className="text-xs text-destructive">
+                {errMsg(field.state.meta.errors[0])}
+              </p>
             )}
           </div>
         )}
@@ -187,7 +200,9 @@ export function ProductForm({
 
       <form.Field
         name="description"
-        validators={{ onChange: z.string().min(10, "At least 10 characters").max(5000) }}
+        validators={{
+          onChange: z.string().min(10, "At least 10 characters").max(5000),
+        }}
       >
         {(field) => (
           <div className="space-y-1.5">
@@ -203,10 +218,13 @@ export function ProductForm({
                     genDesc.mutate({
                       title: form.getFieldValue("title"),
                       categoryName:
-                        (categories ?? []).find((c) => c.id === form.getFieldValue("categoryId"))?.name ??
-                        null,
+                        (categories ?? []).find(
+                          (c) => c.id === form.getFieldValue("categoryId")
+                        )?.name ?? null,
                       tagNames: (tags ?? [])
-                        .filter((t) => form.getFieldValue("tagIds").includes(t.id))
+                        .filter((t) =>
+                          form.getFieldValue("tagIds").includes(t.id)
+                        )
                         .map((t) => t.name),
                     })
                   }
@@ -224,7 +242,9 @@ export function ProductForm({
               onChange={(e) => field.handleChange(e.target.value)}
             />
             {field.state.meta.errors.length > 0 && (
-              <p className="text-destructive text-xs">{errMsg(field.state.meta.errors[0])}</p>
+              <p className="text-xs text-destructive">
+                {errMsg(field.state.meta.errors[0])}
+              </p>
             )}
           </div>
         )}
@@ -280,7 +300,13 @@ export function ProductForm({
             {suggestions.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {suggestions
-                  .filter((name) => !(tags ?? []).some((t) => field.state.value.includes(t.id) && t.name === name))
+                  .filter(
+                    (name) =>
+                      !(tags ?? []).some(
+                        (t) =>
+                          field.state.value.includes(t.id) && t.name === name
+                      )
+                  )
                   .map((name) => {
                     const tag = (tags ?? []).find((t) => t.name === name)
                     if (!tag || field.state.value.includes(tag.id)) return null
@@ -289,7 +315,9 @@ export function ProductForm({
                         key={tag.id}
                         type="button"
                         className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted"
-                        onClick={() => field.handleChange([...field.state.value, tag.id])}
+                        onClick={() =>
+                          field.handleChange([...field.state.value, tag.id])
+                        }
                       >
                         + {name}
                       </button>
@@ -308,7 +336,7 @@ export function ProductForm({
                         field.handleChange(
                           v
                             ? [...field.state.value, t.id]
-                            : field.state.value.filter((id) => id !== t.id),
+                            : field.state.value.filter((id) => id !== t.id)
                         )
                       }
                     />

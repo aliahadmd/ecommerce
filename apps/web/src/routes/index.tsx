@@ -31,11 +31,11 @@ function HomePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <section className="bg-muted mb-10 rounded-2xl px-8 py-14 text-center">
+      <section className="mb-10 rounded-2xl bg-muted px-8 py-14 text-center">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Everything you need, from sellers you can trust
         </h1>
-        <p className="text-muted-foreground mx-auto mt-3 max-w-xl text-sm">
+        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
           A community marketplace. Browse, order, and pay cash on delivery.
         </p>
       </section>
@@ -47,7 +47,7 @@ function HomePage() {
             key={c.id}
             to="/products"
             search={{ category: c.slug }}
-            className="bg-muted hover:bg-secondary rounded-xl px-4 py-6 text-center text-sm font-medium transition-colors"
+            className="rounded-xl bg-muted px-4 py-6 text-center text-sm font-medium transition-colors hover:bg-secondary"
           >
             {c.name}
           </Link>
@@ -60,9 +60,9 @@ function HomePage() {
           ? Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-4/3 w-full" />
             ))
-          : products.items.slice(0, 8).map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+          : products.items
+              .slice(0, 8)
+              .map((p) => <ProductCard key={p.id} product={p} />)}
       </div>
     </main>
   )

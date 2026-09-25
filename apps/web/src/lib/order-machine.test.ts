@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest"
-import { canCancel, canMarkPaid, canTransition, ORDER_TRANSITIONS } from "./order-machine"
+import {
+  canCancel,
+  canMarkPaid,
+  canTransition,
+  ORDER_TRANSITIONS,
+} from "./order-machine"
 import type { OrderStatus } from "./order-machine"
 
-const allStatuses: OrderStatus[] = ["pending", "confirmed", "shipped", "delivered", "cancelled"]
+const allStatuses: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "shipped",
+  "delivered",
+  "cancelled",
+]
 
 describe("ORDER_TRANSITIONS", () => {
   it("defines transitions for every status", () => {
@@ -36,7 +47,11 @@ describe("ORDER_TRANSITIONS", () => {
 })
 
 describe("canCancel", () => {
-  const order = { status: "pending" as OrderStatus, buyerId: "buyer-1", shopIds: ["shop-1"] }
+  const order = {
+    status: "pending" as OrderStatus,
+    buyerId: "buyer-1",
+    shopIds: ["shop-1"],
+  }
 
   it("buyer cancels own pending order", () => {
     expect(canCancel(order, { id: "buyer-1", role: "buyer" })).toBe(true)
@@ -45,10 +60,14 @@ describe("canCancel", () => {
     expect(canCancel(order, { id: "buyer-2", role: "buyer" })).toBe(false)
   })
   it("seller of the shop can cancel", () => {
-    expect(canCancel(order, { id: "seller-1", role: "seller", shopId: "shop-1" })).toBe(true)
+    expect(
+      canCancel(order, { id: "seller-1", role: "seller", shopId: "shop-1" })
+    ).toBe(true)
   })
   it("seller of another shop cannot", () => {
-    expect(canCancel(order, { id: "seller-1", role: "seller", shopId: "shop-9" })).toBe(false)
+    expect(
+      canCancel(order, { id: "seller-1", role: "seller", shopId: "shop-9" })
+    ).toBe(false)
   })
   it("seller without a resolved shop cannot cancel", () => {
     expect(canCancel(order, { id: "seller-1", role: "seller" })).toBe(false)
@@ -57,8 +76,14 @@ describe("canCancel", () => {
     expect(canCancel(order, { id: "admin-1", role: "super_admin" })).toBe(true)
   })
   it("nobody cancels shipped/delivered orders", () => {
-    for (const status of ["shipped", "delivered", "cancelled"] as OrderStatus[]) {
-      expect(canCancel({ ...order, status }, { id: "admin-1", role: "super_admin" })).toBe(false)
+    for (const status of [
+      "shipped",
+      "delivered",
+      "cancelled",
+    ] as OrderStatus[]) {
+      expect(
+        canCancel({ ...order, status }, { id: "admin-1", role: "super_admin" })
+      ).toBe(false)
     }
   })
 })

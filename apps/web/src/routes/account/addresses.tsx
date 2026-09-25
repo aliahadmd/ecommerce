@@ -17,7 +17,10 @@ import { Label } from "@/components/ui/label"
 export const Route = createFileRoute("/account/addresses")({
   beforeLoad: ({ context }) => {
     if (!context.session) {
-      throw redirect({ to: "/login", search: { redirect: "/account/addresses" } })
+      throw redirect({
+        to: "/login",
+        search: { redirect: "/account/addresses" },
+      })
     }
   },
   loader: async ({ context: { queryClient } }) => {
@@ -98,21 +101,34 @@ function AddressesPage() {
                 <div className="font-medium">
                   {a.fullName} · {a.phone}
                   {a.isDefault && <Badge className="ml-2">default</Badge>}
-                  {a.label && <Badge variant="outline" className="ml-2">{a.label}</Badge>}
+                  {a.label && (
+                    <Badge variant="outline" className="ml-2">
+                      {a.label}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-muted-foreground">
                   {a.line1}
                   {a.line2 ? `, ${a.line2}` : ""}, {a.city}
-                  {a.state ? `, ${a.state}` : ""} {a.postalCode ?? ""}, {a.country}
+                  {a.state ? `, ${a.state}` : ""} {a.postalCode ?? ""},{" "}
+                  {a.country}
                 </div>
               </div>
               <div className="flex gap-1.5">
                 {!a.isDefault && (
-                  <Button variant="outline" size="xs" onClick={() => makeDefault.mutate(a.id)}>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => makeDefault.mutate(a.id)}
+                  >
                     Set default
                   </Button>
                 )}
-                <Button variant="ghost" size="xs" onClick={() => remove.mutate(a.id)}>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => remove.mutate(a.id)}
+                >
                   Delete
                 </Button>
               </div>
@@ -120,7 +136,7 @@ function AddressesPage() {
           </Card>
         ))}
         {addresses?.length === 0 && (
-          <p className="text-muted-foreground py-6 text-center text-sm">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             No addresses yet — add one below.
           </p>
         )}

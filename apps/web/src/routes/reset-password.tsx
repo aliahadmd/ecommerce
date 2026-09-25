@@ -30,7 +30,10 @@ function ResetPasswordPage() {
       toast.error("Missing reset token")
       return
     }
-    const { error } = await authClient.resetPassword({ token, newPassword: password })
+    const { error } = await authClient.resetPassword({
+      token,
+      newPassword: password,
+    })
     if (error) {
       toast.error(error.message ?? "Could not reset password")
       return

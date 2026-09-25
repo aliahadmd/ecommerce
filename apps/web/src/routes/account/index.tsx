@@ -42,15 +42,21 @@ function AccountPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {!user.emailVerified && (
-            <p className="text-destructive text-sm">
+            <p className="text-sm text-destructive">
               Your email is not verified yet — check Mailpit for the link.
             </p>
           )}
           <div className="flex flex-wrap gap-2 pt-2">
-            <Button render={<Link to="/account/orders" search={{}} />} variant="outline">
+            <Button
+              render={<Link to="/account/orders" search={{}} />}
+              variant="outline"
+            >
               My orders
             </Button>
-            <Button render={<Link to="/account/addresses" search={{}} />} variant="outline">
+            <Button
+              render={<Link to="/account/addresses" search={{}} />}
+              variant="outline"
+            >
               Addresses
             </Button>
             {user.role === "buyer" && user.emailVerified && (

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { centsToDecimalString, formatMoney, parsePriceToCents, slugify } from "@ecommerce/config"
+import {
+  centsToDecimalString,
+  formatMoney,
+  parsePriceToCents,
+  slugify,
+} from "@ecommerce/config"
 
 describe("parsePriceToCents", () => {
   it("parses decimal strings into integer cents", () => {
@@ -36,7 +41,9 @@ describe("centsToDecimalString", () => {
 
 describe("slugify", () => {
   it("kebab-cases names", () => {
-    expect(slugify("Wireless Mechanical Keyboard")).toBe("wireless-mechanical-keyboard")
+    expect(slugify("Wireless Mechanical Keyboard")).toBe(
+      "wireless-mechanical-keyboard"
+    )
     expect(slugify("  Héllo Wörld!  ")).toBe("hello-world")
     expect(slugify("A  B---C")).toBe("a-b-c")
   })

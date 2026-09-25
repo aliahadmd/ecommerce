@@ -1,7 +1,7 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"
-import { generateObject } from "ai"
-import { z } from "zod"
-import { getEnv } from "@ecommerce/config"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { generateObject } from "ai";
+import { z } from "zod";
+import { getEnv } from "@ecommerce/config";
 
 /**
  * AI helpers on the AI SDK + OpenRouter (plan-10). Every feature degrades
@@ -10,23 +10,23 @@ import { getEnv } from "@ecommerce/config"
  */
 
 export function isAiEnabled(): boolean {
-  return getEnv().OPENROUTER_API_KEY.length > 0
+  return getEnv().OPENROUTER_API_KEY.length > 0;
 }
 
 function getModel() {
-  const env = getEnv()
-  const openrouter = createOpenRouter({ apiKey: env.OPENROUTER_API_KEY })
-  return openrouter.chat(env.AI_MODEL)
+  const env = getEnv();
+  const openrouter = createOpenRouter({ apiKey: env.OPENROUTER_API_KEY });
+  return openrouter.chat(env.AI_MODEL);
 }
 
 const descriptionSchema = z.object({
   description: z.string().min(1).max(1200),
-})
+});
 
 export async function generateProductDescription(input: {
-  title: string
-  categoryName?: string | null
-  tagNames?: string[]
+  title: string;
+  categoryName?: string | null;
+  tagNames?: string[];
 }): Promise<string> {
   const { object } = await generateObject({
     model: getModel(),
@@ -39,26 +39,24 @@ export async function generateProductDescription(input: {
       "",
       `Product title: ${input.title}`,
       input.categoryName ? `Category: ${input.categoryName}` : null,
-      input.tagNames && input.tagNames.length > 0
-        ? `Tags: ${input.tagNames.join(", ")}`
-        : null,
+      input.tagNames && input.tagNames.length > 0 ? `Tags: ${input.tagNames.join(", ")}` : null,
     ]
       .filter(Boolean)
       .join("\n"),
     maxOutputTokens: 400,
     temperature: 0.7,
-  })
-  return object.description
+  });
+  return object.description;
 }
 
 const tagsSchema = z.object({
   tags: z.array(z.string().min(1).max(40)).max(5),
-})
+});
 
 export async function suggestTagsForProduct(input: {
-  title: string
-  description: string
-  existingTagNames: string[]
+  title: string;
+  description: string;
+  existingTagNames: string[];
 }): Promise<string[]> {
   const { object } = await generateObject({
     model: getModel(),
@@ -73,9 +71,7 @@ export async function suggestTagsForProduct(input: {
     ].join("\n"),
     maxOutputTokens: 200,
     temperature: 0.3,
-  })
-  const existing = new Set(
-    input.existingTagNames.map((t) => t.toLowerCase()),
-  )
-  return object.tags.filter((t) => existing.has(t.toLowerCase()))
+  });
+  const existing = new Set(input.existingTagNames.map((t) => t.toLowerCase()));
+  return object.tags.filter((t) => existing.has(t.toLowerCase()));
 }

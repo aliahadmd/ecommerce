@@ -1,6 +1,6 @@
-import "dotenv/config"
-import { defineConfig } from "drizzle-kit"
-import { getEnv } from "./src/env-proxy"
+import "dotenv/config";
+import { defineConfig } from "drizzle-kit";
+import { getEnv } from "./src/env-proxy";
 
 export default defineConfig({
   dialect: "postgresql",
@@ -9,4 +9,4 @@ export default defineConfig({
   dbCredentials: {
     url: getEnv().DATABASE_URL,
   },
-})
+});

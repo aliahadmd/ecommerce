@@ -1,1 +1,1 @@
-export { auth, type Session } from "./server"
+export { auth, type Session } from "./server";

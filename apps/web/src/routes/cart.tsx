@@ -17,7 +17,10 @@ export const Route = createFileRoute("/cart")({
     }
   },
   loader: async ({ context: { queryClient } }) => {
-    await queryClient.ensureQueryData({ queryKey: ["cart"], queryFn: () => getCart().then(unwrap) })
+    await queryClient.ensureQueryData({
+      queryKey: ["cart"],
+      queryFn: () => getCart().then(unwrap),
+    })
   },
   component: CartPage,
 })
@@ -39,7 +42,7 @@ function CartPage() {
     onSuccess: (r) => {
       if (r.ok) afterMutation(r.data.count)
     },
-    onError: (e) => toast.error((e).message),
+    onError: (e) => toast.error(e.message),
   })
   const update = useMutation({
     mutationFn: (input: { itemId: string; quantity: number }) =>
@@ -49,9 +52,10 @@ function CartPage() {
         toast.error(r.error.message)
         return
       }
-      if ("count" in r.data && typeof r.data.count === "number") afterMutation(r.data.count)
+      if ("count" in r.data && typeof r.data.count === "number")
+        afterMutation(r.data.count)
     },
-    onError: (e) => toast.error((e).message),
+    onError: (e) => toast.error(e.message),
   })
 
   if (!cart) return null
@@ -61,7 +65,7 @@ function CartPage() {
       <h1 className="mb-6 text-xl font-semibold">Your cart</h1>
       {cart.items.length === 0 ? (
         <Card>
-          <CardContent className="text-muted-foreground py-12 text-center text-sm">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
             Your cart is empty.{" "}
             <Link to="/products" search={{}} className="underline">
               Browse products
@@ -72,12 +76,22 @@ function CartPage() {
         <div className="space-y-4">
           {cart.items.map((item) => (
             <Card key={item.itemId} className="flex-row items-center gap-4 p-4">
-              <Link to="/products/$slug" params={{ slug: item.slug }} className="shrink-0">
-                <div className="bg-muted size-16 overflow-hidden rounded-lg">
+              <Link
+                to="/products/$slug"
+                params={{ slug: item.slug }}
+                className="shrink-0"
+              >
+                <div className="size-16 overflow-hidden rounded-lg bg-muted">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <div className="flex h-full items-center justify-center">🛍️</div>
+                    <div className="flex h-full items-center justify-center">
+                      🛍️
+                    </div>
                   )}
                 </div>
               </Link>
@@ -89,10 +103,13 @@ function CartPage() {
                 >
                   {item.title}
                 </Link>
-                <p className="text-muted-foreground text-xs">
-                  {formatMoney(item.priceCents, item.currency)} · {item.shopName}
+                <p className="text-xs text-muted-foreground">
+                  {formatMoney(item.priceCents, item.currency)} ·{" "}
+                  {item.shopName}
                   {item.quantity > item.stock && (
-                    <span className="text-destructive ml-2">only {item.stock} left</span>
+                    <span className="ml-2 text-destructive">
+                      only {item.stock} left
+                    </span>
                   )}
                 </p>
               </div>
@@ -101,7 +118,10 @@ function CartPage() {
                   variant="outline"
                   size="icon-xs"
                   onClick={() =>
-                    update.mutate({ itemId: item.itemId, quantity: item.quantity - 1 })
+                    update.mutate({
+                      itemId: item.itemId,
+                      quantity: item.quantity - 1,
+                    })
                   }
                 >
                   −
@@ -121,7 +141,10 @@ function CartPage() {
                   variant="outline"
                   size="icon-xs"
                   onClick={() =>
-                    update.mutate({ itemId: item.itemId, quantity: item.quantity + 1 })
+                    update.mutate({
+                      itemId: item.itemId,
+                      quantity: item.quantity + 1,
+                    })
                   }
                 >
                   +
@@ -145,10 +168,13 @@ function CartPage() {
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
             <span className="font-semibold">
-              {formatMoney(cart.subtotalCents, cart.items[0]?.currency ?? "USD")}
+              {formatMoney(
+                cart.subtotalCents,
+                cart.items[0]?.currency ?? "USD"
+              )}
             </span>
           </div>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Payment: cash on delivery — you pay when the order arrives.
           </p>
           <div className="flex justify-end">

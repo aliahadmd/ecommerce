@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter  } from "@tanstack/react-router"
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -23,7 +23,7 @@ function VerifyEmailPage() {
   const router = useRouter()
   const { token } = Route.useSearch()
   const [state, setState] = useState<"pending" | "success" | "error">(
-    token ? "pending" : "error",
+    token ? "pending" : "error"
   )
   const [message, setMessage] = useState("")
   const ran = useRef(false)
@@ -71,7 +71,9 @@ function VerifyEmailPage() {
           {state === "pending" && <p>Verifying…</p>}
           {state === "success" && (
             <>
-              <p className="text-sm">Your email is verified — you're signed in.</p>
+              <p className="text-sm">
+                Your email is verified — you're signed in.
+              </p>
               <Button render={<Link to="/" />} className="w-full">
                 Start shopping
               </Button>
@@ -79,7 +81,7 @@ function VerifyEmailPage() {
           )}
           {state === "error" && (
             <>
-              {message && <p className="text-destructive text-sm">{message}</p>}
+              {message && <p className="text-sm text-destructive">{message}</p>}
               <form onSubmit={resend} className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="email">Email</Label>

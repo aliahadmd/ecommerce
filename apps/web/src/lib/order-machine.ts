@@ -26,7 +26,7 @@ export type OrderViewer = {
 /** Who may cancel: buyer (own, pending/confirmed), seller (own-shop orders, same stages), admin (any order, same stages). */
 export function canCancel(
   order: { status: OrderStatus; buyerId: string; shopIds: string[] },
-  viewer: OrderViewer,
+  viewer: OrderViewer
 ): boolean {
   if (order.status !== "pending" && order.status !== "confirmed") return false
   if (viewer.role === "super_admin") return true
@@ -35,7 +35,11 @@ export function canCancel(
 }
 
 /** Cash is collected on delivery; admin may reconcile manually at any live stage. */
-export function canMarkPaid(status: OrderStatus, paymentStatus: PaymentStatus, viewer: OrderViewer): boolean {
+export function canMarkPaid(
+  status: OrderStatus,
+  paymentStatus: PaymentStatus,
+  viewer: OrderViewer
+): boolean {
   if (paymentStatus !== "unpaid" || status === "cancelled") return false
   if (viewer.role === "super_admin") return true
   return status === "delivered"

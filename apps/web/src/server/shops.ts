@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
-import { eq, db, schema  } from "@ecommerce/db"
+import { eq, db, schema } from "@ecommerce/db"
 import { z } from "zod"
 import { slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireUser } from "./session"
@@ -15,7 +15,10 @@ export const createShop = createServerFn({ method: "POST" })
     guard(async () => {
       const user = await requireUser()
       if (!user.emailVerified) {
-        throw new AppError("EMAIL_UNVERIFIED", "Verify your email before opening a shop")
+        throw new AppError(
+          "EMAIL_UNVERIFIED",
+          "Verify your email before opening a shop"
+        )
       }
       if (user.role === "seller") {
         throw new AppError("ALREADY_SELLER", "You already have a shop")
@@ -47,5 +50,5 @@ export const createShop = createServerFn({ method: "POST" })
       })
 
       return { id: shop.id, slug: shop.slug }
-    }),
+    })
   )

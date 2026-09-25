@@ -1,12 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { formatMoney } from "@ecommerce/config"
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card"
 
 export interface ProductCardData {
   id: string
@@ -23,8 +18,12 @@ export interface ProductCardData {
 export function ProductCard({ product }: { product: ProductCardData }) {
   return (
     <Card className="gap-0 overflow-hidden pt-0">
-      <Link to="/products/$slug" params={{ slug: product.slug }} className="block">
-        <div className="bg-muted aspect-4/3 w-full overflow-hidden">
+      <Link
+        to="/products/$slug"
+        params={{ slug: product.slug }}
+        className="block"
+      >
+        <div className="aspect-4/3 w-full overflow-hidden bg-muted">
           {product.imageUrl ? (
             <img
               src={product.imageUrl}
@@ -33,7 +32,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               loading="lazy"
             />
           ) : (
-            <div className="text-muted-foreground flex h-full items-center justify-center text-3xl">
+            <div className="flex h-full items-center justify-center text-3xl text-muted-foreground">
               🛍️
             </div>
           )}
@@ -58,7 +57,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           <Link
             to="/shops/$slug"
             params={{ slug: product.shopSlug }}
-            className="text-muted-foreground hover:text-foreground text-xs"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             {product.shopName}
           </Link>

@@ -1,4 +1,10 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router"
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -18,7 +24,10 @@ import { Textarea } from "@/components/ui/textarea"
 export const Route = createFileRoute("/seller/onboarding")({
   beforeLoad: ({ context }) => {
     if (!context.session) {
-      throw redirect({ to: "/login", search: { redirect: "/seller/onboarding" } })
+      throw redirect({
+        to: "/login",
+        search: { redirect: "/seller/onboarding" },
+      })
     }
     if (context.session.role === "seller") {
       throw redirect({ to: "/seller" })
@@ -28,7 +37,9 @@ export const Route = createFileRoute("/seller/onboarding")({
 })
 
 function errMsg(e: unknown): string {
-  return typeof e === "string" ? e : (e as { message?: string })?.message ?? "Invalid"
+  return typeof e === "string"
+    ? e
+    : ((e as { message?: string })?.message ?? "Invalid")
 }
 
 function SellerOnboardingPage() {
@@ -39,7 +50,9 @@ function SellerOnboardingPage() {
   const form = useForm({
     defaultValues: { name: "", description: "" },
     onSubmit: async ({ value }) => {
-      const result = await createShop({ data: { name: value.name, description: value.description || undefined } })
+      const result = await createShop({
+        data: { name: value.name, description: value.description || undefined },
+      })
       if (!result.ok) {
         toast.error(result.error.message)
         return
@@ -91,7 +104,9 @@ function SellerOnboardingPage() {
           >
             <form.Field
               name="name"
-              validators={{ onChange: z.string().min(3, "At least 3 characters").max(80) }}
+              validators={{
+                onChange: z.string().min(3, "At least 3 characters").max(80),
+              }}
             >
               {(field) => (
                 <div className="space-y-1.5">
@@ -103,7 +118,7 @@ function SellerOnboardingPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
@@ -112,7 +127,9 @@ function SellerOnboardingPage() {
             </form.Field>
             <form.Field
               name="description"
-              validators={{ onChange: z.string().max(500, "Max 500 characters") }}
+              validators={{
+                onChange: z.string().max(500, "Max 500 characters"),
+              }}
             >
               {(field) => (
                 <div className="space-y-1.5">
@@ -125,7 +142,7 @@ function SellerOnboardingPage() {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
+                    <p className="text-xs text-destructive">
                       {errMsg(field.state.meta.errors[0])}
                     </p>
                   )}
