@@ -1,0 +1,25 @@
+{
+  "name": "ecommerce",
+  "private": true,
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @ecommerce/web dev",
+    "build": "pnpm --filter @ecommerce/web build",
+    "start": "pnpm --filter @ecommerce/web start",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @ecommerce/db generate",
+    "db:migrate": "pnpm --filter @ecommerce/db migrate",
+    "db:seed": "pnpm --filter @ecommerce/db seed",
+    "db:studio": "pnpm --filter @ecommerce/db studio"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}

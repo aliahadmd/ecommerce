@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+.output/
+.vinxi/
+.nitro/
+.tanstack/
+*.tsbuildinfo
+
+# env
+.env
+.env.*
+!.env.example
+
+# docker local data (named volumes are used, but be safe)
+docker/data/
+
+# testing / coverage
+coverage/
+
+# misc
+.DS_Store
+*.log
+.turbo/
+.vite/
+drizzle/meta/_journal.json.bak
