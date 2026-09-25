@@ -54,7 +54,7 @@ export function WishlistHeart({
     },
     onError: (e) => {
       setOptimistic(null)
-      toast.error((e as Error).message)
+      toast.error(e.message)
     },
   })
 

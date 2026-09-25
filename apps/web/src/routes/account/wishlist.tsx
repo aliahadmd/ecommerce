@@ -1,12 +1,12 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
+
 import { formatMoney } from "@ecommerce/config"
 import { listWishlist, toggleWishlist } from "@/server/wishlist"
 import { unwrap } from "@/lib/unwrap"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Heart } from "lucide-react"
 
