@@ -1,6 +1,6 @@
 # Plan 4 — Coupons & Promotions
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-2 (sub-orders for discount allocation)
 **Estimated effort:** 2 days
 
@@ -79,3 +79,9 @@ CREATE INDEX coupon_redemptions_coupon_user_idx ON coupon_redemptions (coupon_id
 ## Explicitly not in this plan
 
 Auto-applied promotions, sale prices on products, buy-X-get-Y, seller-created coupons (phase 4 candidates).
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. Discount allocated across sub-orders with remainder-to-last; coupon redemption written inside checkout tx.

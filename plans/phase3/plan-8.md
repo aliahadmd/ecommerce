@@ -1,6 +1,6 @@
 # Plan 8 — Admin Settings & Moderation Upgrades
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-5 (commission rate consumer)
 **Estimated effort:** 1.5 days
 
@@ -67,3 +67,9 @@ CREATE TABLE review_reports (
 ## Explicitly not in this plan
 
 Seller-facing settings UI, per-shop commission overrides, review edit history audit, automated abuse detection.
+
+---
+
+## As-built note (2026-09-26)
+
+Settings table with typed StoreSettings (maintenance/signups/commission/contact); review photos (max 3, server-validated); abuse reports (unique per user/review) + admin reported queue.

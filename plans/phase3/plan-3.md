@@ -1,6 +1,6 @@
 # Plan 3 — Online Payments
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-2 (sub-orders own fulfillment; payments settle the parent)
 **Estimated effort:** 3 days
 
@@ -92,3 +92,9 @@ On `succeeded`: parent order status `confirmed` (card orders skip the pending-co
 ## Explicitly not in this plan
 
 Sub-order-scoped partial refunds (follow-up), payment provider onboarding/KYC UI, saving cards, 3-D Secure edge cases beyond Stripe defaults.
+
+---
+
+## As-built note (2026-09-26)
+
+COD backfill shipped in migration 0014 (payment rows for legacy orders). Stripe SDK loaded via variable dynamic import (optional peer, not a compile dep). Fake gateway callbacks HMAC-signed with BETTER_AUTH_SECRET-derived key.

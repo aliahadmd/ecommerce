@@ -1,6 +1,6 @@
 # Plan 1 — Phase 3 Overview & Architecture
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** Phase 2 complete (all plans Done, audit fixes applied, e2e 8/8)
 **Date:** 2026-09-26
 
@@ -111,3 +111,9 @@ plan-2 first (foundational). plan-3/4/5 sequential (all touch the checkout). pla
 - [ ] Admin settings control maintenance mode, signups, and commission rate.
 - [ ] GitHub Actions runs the full gate suite on PR and publishes the Docker image on main.
 - [ ] Gates stay green: typecheck, Vitest, lint, Playwright, health.
+
+---
+
+## As-built note (2026-09-26)
+
+All 8 plan bodies implemented; payments verified via fake gateway; Stripe adapter compiled but live test-mode run still needs a key.

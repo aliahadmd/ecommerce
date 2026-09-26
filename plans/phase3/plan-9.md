@@ -1,6 +1,6 @@
 # Plan 9 — CI/CD & Quality Uplift
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plans 2–8
 **Estimated effort:** 2 days
 
@@ -53,3 +53,9 @@ Concurrency group cancels superseded runs. Playwright artifacts (screenshots/tra
 ## Explicitly not in this plan
 
 Dokploy deployment automation itself (docs stay manual), preview environments per PR, release tagging/changelogs, coverage thresholds.
+
+---
+
+## As-built note (2026-09-26)
+
+CI workflow gates PRs (typecheck/lint/test) then e2e with postgres/redis/mailpit services then build; main pushes publish GHCR image.

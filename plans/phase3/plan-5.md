@@ -1,6 +1,6 @@
 # Plan 5 — Seller Payouts & Ledger
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** plan-2 (sub-orders), plan-3 (payment settlement), plan-8 (commission setting read)
 **Estimated effort:** 2 days
 
@@ -76,3 +76,9 @@ CREATE TABLE payouts (
 ## Explicitly not in this plan
 
 Automatic scheduled payouts (cron), tax forms, multi-currency payouts, payment-provider payouts (Stripe Connect) — phase 4 candidates.
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. Ledger written on sub-order delivery via payouts-internals (server-only). Admin payout validates against available balance inside tx.

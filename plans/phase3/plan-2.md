@@ -1,6 +1,6 @@
 # Plan 2 — Per-Seller Sub-Orders
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (foundational for plans 3–5)
 **Estimated effort:** 3 days — the largest plan of phase 3
 
@@ -72,3 +72,9 @@ Reuses the phase-1 matrix per sub-order (`lib/order-machine.ts` gains `SubOrderS
 ## Explicitly not in this plan
 
 Per-sub-order payments/refunds (plan-3), per-sub-order shipping fees beyond the allocation rule (plan-4/5 refine), partial item-level cancellations.
+
+---
+
+## As-built note (2026-09-26)
+
+As planned. Backfill shipped inside migration 0013 (synthetic sub-orders per shop; shipping to first). Parent status derived via recomputeOrderStatus.

@@ -1,6 +1,6 @@
 # Plan 6 — Background Jobs, Email Queue & Notifications
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (integrates with plan-2/3 events)
 **Estimated effort:** 2.5 days
 
@@ -63,3 +63,9 @@ Server fns: `listNotifications({ unreadOnly?, page })`, `markRead({ ids })`, `ma
 ## Explicitly not in this plan
 
 Websockets/push (polling is fine at this scale), user notification preferences UI, digest emails.
+
+---
+
+## As-built note (2026-09-26)
+
+BullMQ email+notify queues, separate apps/worker process (tsx), retries with exponential backoff, jobId dedupe. In-app notifications + bell + /account/notifications page. Back-in-stock fires on sub-order cancellation restock.

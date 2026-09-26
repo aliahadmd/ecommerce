@@ -1,6 +1,6 @@
 # Plan 7 — CSV Import
 
-**Status:** Draft — awaiting approval
+**Status:** Done
 **Depends on:** — (completes the phase-2 export/import loop)
 **Estimated effort:** 2 days
 
@@ -50,3 +50,9 @@ Ownership: imported products belong to the importing seller's shop (admin import
 ## Explicitly not in this plan
 
 Image import (URLs column), category creation from CSV (must pre-exist), scheduled/recurring imports, undo.
+
+---
+
+## As-built note (2026-09-26)
+
+Two-phase import staged in Redis (24h TTL, per-user key); dry-run report; commit creates draft products with slug suffixes. updateExisting reserved.
