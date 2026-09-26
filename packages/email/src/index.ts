@@ -160,6 +160,22 @@ export async function sendPaymentReceivedEmail(
   });
 }
 
+export async function sendBackInStockEmail(
+  to: string,
+  productTitle: string,
+  productUrl: string
+): Promise<void> {
+  await sendMail({
+    to,
+    subject: `Back in stock: ${productTitle}`,
+    html: layout(
+      "Back in stock",
+      `<p><strong>${escapeHtml(productTitle)}</strong> is back in stock.</p>${button(productUrl, "View product")}`,
+    ),
+    text: `${productTitle} is back in stock: ${productUrl}`,
+  })
+}
+
 export async function sendOrderCancelledEmail(
   to: string,
   orderNumber: string,

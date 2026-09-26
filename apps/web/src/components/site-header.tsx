@@ -17,9 +17,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getCart } from "@/lib/cart-rpc"
 import { roleLabels } from "@/lib/role"
 import { setCartCount, useCartCount } from "@/lib/cart-store"
+import { Bell, ShoppingBag, Search, LogOut, Moon, Shield, Store, Sun, User  } from "lucide-react"
 import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
 import type { AppUser } from "@/server/session"
-import { ShoppingBag, Search, LogOut, Moon, Shield, Store, Sun, User } from "lucide-react"
 
 /** Search + cart + role-aware account menu. Re-renders from root context. */
 export function Header({ user }: { user: AppUser | null }) {
@@ -78,6 +78,16 @@ export function Header({ user }: { user: AppUser | null }) {
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
+          {user && (
+            <Button
+              render={<Link to="/account/notifications" />}
+              variant="ghost"
+              size="icon"
+              aria-label="Notifications"
+            >
+              <Bell className="size-4" />
+            </Button>
+          )}
           <Button
             render={<Link to="/cart" search={{}} />}
             variant="ghost"

@@ -9,6 +9,7 @@ import {
 } from "@ecommerce/email"
 import { db } from "@ecommerce/db"
 import { notifications } from "@ecommerce/db/schema"
+import { sendBackInStockEmail } from "@ecommerce/email"
 
 export async function handleEmailJob(job: EmailJobData): Promise<void> {
   const p = job.payload as Record<string, string>
@@ -37,12 +38,7 @@ export async function handleEmailJob(job: EmailJobData): Promise<void> {
       await sendOrderCancelledEmail(job.to, p.orderNumber, p.reason || null)
       break
     case "back_in_stock":
-      await sendOrderPlacedEmail(job.to, {
-        orderNumber: "back-in-stock",
-        items: [{ title: p.productTitle, quantity: 1, totalFormatted: "" }],
-        totalFormatted: "",
-        shipAddress: "",
-      })
+      await sendBackInStockEmail(job.to, p.productTitle, p.productUrl)
       break
   }
 }

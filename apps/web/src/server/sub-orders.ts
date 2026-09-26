@@ -182,7 +182,9 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
             })
             .from(schema.orderItems)
             .where(eq(schema.orderItems.subOrderId, data.subOrderId))
-          const { recomputeProductAggregates } = await import("./internals")
+          const { notifyBackInStock, recomputeProductAggregates } = await import(
+            "./internals"
+          )
           const variantProductIds = new Set<string>()
           for (const item of items) {
             if (item.variantId) {
@@ -200,6 +202,10 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
           }
           for (const pid of variantProductIds) {
             await recomputeProductAggregates(tx, pid)
+          }
+          // back-in-stock notifications for wishlist watchers (plan-6)
+          for (const pid of variantProductIds) {
+            void notifyBackInStock(pid)
           }
           await recomputeOrderStatus(tx, row.sub.orderId)
         })

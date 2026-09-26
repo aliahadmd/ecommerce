@@ -1,14 +1,9 @@
 import { createServerFn } from "@tanstack/react-start"
 import { db, schema, and, desc, eq, gte, inArray, sql } from "@ecommerce/db"
 import { formatMoney, getEnv } from "@ecommerce/config"
-import {
-  sendOrderCancelledEmail,
-  sendOrderPlacedEmail,
-  sendOrderStatusEmail,
-  sendPaymentReceivedEmail,
-} from "@ecommerce/email"
 import type { OrderEmailItem } from "@ecommerce/email"
 import { recomputeProductAggregates } from "./internals"
+import { enqueueEmail } from "@ecommerce/jobs"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { canCancel, canMarkPaid, canTransition } from "@/lib/order-machine"
 import type { OrderStatus } from "@/lib/order-machine"
@@ -660,11 +655,16 @@ export const placeOrder = createServerFn({ method: "POST" })
       }))
       const addressText = `${result.shipLine1}${result.shipLine2 ? ", " + result.shipLine2 : ""}, ${result.shipCity} ${result.shipPostalCode ?? ""}, ${result.shipCountry}`
       const totalFormatted = formatMoney(result.totalCents, result.currency)
-      void sendOrderPlacedEmail(user.email, {
-        orderNumber: result.orderNumber,
-        items: emailItems,
-        totalFormatted,
-        shipAddress: addressText,
+      void enqueueEmail({
+        template: "order_placed",
+        to: user.email,
+        payload: {
+          orderNumber: result.orderNumber,
+          items: JSON.stringify(emailItems),
+          totalFormatted,
+          shipAddress: addressText,
+        },
+        dedupeKey: `email:order_placed:${result.id}:${user.email}`,
       })
       for (const shop of shops) {
         const [owner] = await db
@@ -673,11 +673,16 @@ export const placeOrder = createServerFn({ method: "POST" })
           .where(eq(schema.users.id, shop.ownerId))
           .limit(1)
         if (owner) {
-          void sendOrderPlacedEmail(owner.email, {
-            orderNumber: result.orderNumber,
-            items: emailItems,
-            totalFormatted,
-            shipAddress: addressText,
+          void enqueueEmail({
+            template: "order_placed",
+            to: owner.email,
+            payload: {
+              orderNumber: result.orderNumber,
+              items: JSON.stringify(emailItems),
+              totalFormatted,
+              shipAddress: addressText,
+            },
+            dedupeKey: `email:order_placed:${result.id}:${owner.email}`,
           })
         }
       }
@@ -901,19 +906,26 @@ async function orderEmails(
   if (!buyer) return
   const totalFormatted = formatMoney(order.totalCents, order.currency)
   if (kind === "status" && extra?.status) {
-    void sendOrderStatusEmail(buyer.email, order.orderNumber, extra.status)
+    void enqueueEmail({
+      template: "order_status",
+      to: buyer.email,
+      payload: { orderNumber: order.orderNumber, status: extra.status },
+      dedupeKey: `email:order_status:${order.id}:${extra.status}`,
+    })
   } else if (kind === "paid") {
-    void sendPaymentReceivedEmail(
-      buyer.email,
-      order.orderNumber,
-      totalFormatted
-    )
+    void enqueueEmail({
+      template: "payment_received",
+      to: buyer.email,
+      payload: { orderNumber: order.orderNumber, totalFormatted },
+      dedupeKey: `email:payment_received:${order.id}`,
+    })
   } else if (kind === "cancelled") {
-    void sendOrderCancelledEmail(
-      buyer.email,
-      order.orderNumber,
-      extra?.reason ?? null
-    )
+    void enqueueEmail({
+      template: "order_cancelled",
+      to: buyer.email,
+      payload: { orderNumber: order.orderNumber, reason: extra?.reason ?? "" },
+      dedupeKey: `email:order_cancelled:${order.id}`,
+    })
   }
 }
 

@@ -107,10 +107,14 @@ export async function recomputeOrderStatus(
  * Notify every user who wishlisted a product that it's back in stock
  * (plan-6). Enqueues in-app notifications + a back_in_stock email.
  */
-export async function notifyBackInStock(
-  productId: string,
-  productTitle: string
-): Promise<void> {
+export async function notifyBackInStock(productId: string): Promise<void> {
+  const [prod] = await db
+    .select({ title: schema.products.title, stock: schema.products.stock })
+    .from(schema.products)
+    .where(eq(schema.products.id, productId))
+    .limit(1)
+  if (!prod || prod.stock <= 0) return
+  const productTitle = prod.title
   const watchers = await db
     .select({ userId: schema.wishlistItems.userId })
     .from(schema.wishlistItems)

@@ -21,6 +21,7 @@ import { Route as SellerRouteImport } from './routes/seller'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as AccountAddressesRouteImport } from './routes/account/addresses'
+import { Route as AccountNotificationsRouteImport } from './routes/account/notifications'
 import { Route as AccountWishlistRouteImport } from './routes/account/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
@@ -106,6 +107,11 @@ const AccountIndexRoute = AccountIndexRouteImport.update({
 const AccountAddressesRoute = AccountAddressesRouteImport.update({
   id: '/account/addresses',
   path: '/account/addresses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
+  id: '/account/notifications',
+  path: '/account/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountWishlistRoute = AccountWishlistRouteImport.update({
@@ -251,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
@@ -289,6 +296,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
@@ -330,6 +338,7 @@ export interface FileRoutesById {
   '/seller': typeof SellerRouteWithChildren
   '/verify-email': typeof VerifyEmailRoute
   '/account/addresses': typeof AccountAddressesRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/wishlist': typeof AccountWishlistRoute
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
@@ -372,6 +381,7 @@ export interface FileRouteTypes {
     | '/seller'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/notifications'
     | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/coupons'
@@ -410,6 +420,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/notifications'
     | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/coupons'
@@ -450,6 +461,7 @@ export interface FileRouteTypes {
     | '/seller'
     | '/verify-email'
     | '/account/addresses'
+    | '/account/notifications'
     | '/account/wishlist'
     | '/admin/catalog'
     | '/admin/coupons'
@@ -491,6 +503,7 @@ export interface RootRouteChildren {
   SellerRoute: typeof SellerRouteWithChildren
   VerifyEmailRoute: typeof VerifyEmailRoute
   AccountAddressesRoute: typeof AccountAddressesRoute
+  AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountWishlistRoute: typeof AccountWishlistRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
@@ -587,6 +600,13 @@ declare module '@tanstack/react-router' {
       path: '/account/addresses'
       fullPath: '/account/addresses'
       preLoaderRoute: typeof AccountAddressesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/notifications': {
+      id: '/account/notifications'
+      path: '/account/notifications'
+      fullPath: '/account/notifications'
+      preLoaderRoute: typeof AccountNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/wishlist': {
@@ -847,6 +867,7 @@ const rootRouteChildren: RootRouteChildren = {
   SellerRoute: SellerRouteWithChildren,
   VerifyEmailRoute: VerifyEmailRoute,
   AccountAddressesRoute: AccountAddressesRoute,
+  AccountNotificationsRoute: AccountNotificationsRoute,
   AccountWishlistRoute: AccountWishlistRoute,
   ApiHealthRoute: ApiHealthRoute,
   ProductsSlugRoute: ProductsSlugRoute,
