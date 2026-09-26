@@ -602,6 +602,9 @@ export const placeOrder = createServerFn({ method: "POST" })
             )
         }
         await tx
+          .insert(schema.orderItems)
+          .values(orderItems.map((i) => ({ ...i, orderId: order.id })))
+        await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))
         if (couponId) {

@@ -134,6 +134,13 @@
       "when": 1790451978184,
       "tag": "0018_gray_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790452846424,
+      "tag": "0019_exotic_kingpin",
+      "breakpoints": true
     }
   ]
 }

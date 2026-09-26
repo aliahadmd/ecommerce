@@ -107,16 +107,25 @@ test("review: purchase → deliver → post review → visible", async ({ page }
   await expect(page.getByText(/placed — pay cash on delivery/)).toBeVisible({
     timeout: 15_000,
   })
+  await page.waitForTimeout(1000)
+  const ordText = await page
+    .getByText(/ORD-/)
+    .first()
+    .innerText()
+  const orderNumber = ordText.match(/ORD-[0-9A-Z-]+/)?.[0]
+  expect(orderNumber, `order number from: ${ordText}`).toBeTruthy()
 
-  // seller delivers it
+  // seller delivers it (target this exact order's row)
   await login(page, "seller@dev.local", "Seller1234!")
   await page.goto("/seller/orders")
   await page.waitForTimeout(1500)
-  await page.getByRole("button", { name: "Confirm" }).first().click()
+  const row = page.locator("tr", { hasText: orderNumber! }).first()
+  await expect(row).toBeVisible({ timeout: 15_000 })
+  await row.getByRole("button", { name: "Confirm" }).click()
   await page.waitForTimeout(800)
-  await page.getByRole("button", { name: "Ship" }).first().click()
+  await row.getByRole("button", { name: "Ship" }).click()
   await page.waitForTimeout(800)
-  await page.getByRole("button", { name: "Mark delivered" }).first().click()
+  await row.getByRole("button", { name: "Mark delivered" }).click()
   await page.waitForTimeout(1000)
 
   // buyer reviews the delivered product

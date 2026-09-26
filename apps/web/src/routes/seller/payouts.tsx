@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { redirect } from "@tanstack/react-router"
+import { createFileRoute, redirect  } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { getSellerBalance, getSellerStatement } from "@/server/payouts"

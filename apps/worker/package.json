@@ -1,0 +1,22 @@
+{
+  "name": "@ecommerce/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ecommerce/config": "workspace:*",
+    "@ecommerce/db": "workspace:*",
+    "@ecommerce/email": "workspace:*",
+    "@ecommerce/jobs": "workspace:*",
+    "bullmq": "^5.34.0",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "^5.9.3"
+  }
+}

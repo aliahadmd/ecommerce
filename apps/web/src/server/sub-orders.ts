@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { db, schema, desc, eq, inArray, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { recomputeOrderStatus } from "./internals"
+import { enqueueEmail, enqueueNotification } from "@ecommerce/jobs"
 import { canTransition  } from "@/lib/order-machine"
 import type {OrderStatus} from "@/lib/order-machine";
 
@@ -231,11 +232,33 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
           .set({ status: data.status })
           .where(eq(schema.subOrders.id, data.subOrderId))
         await recomputeOrderStatus(tx, row.sub.orderId)
-        // seller earnings ledger entry on delivery (plan-5)
         if (data.status === "delivered") {
           const { ledgerSaleForSubOrder } = await import("./payouts-internals")
           await ledgerSaleForSubOrder(tx, data.subOrderId)
         }
+      })
+      // worker-delivered email + in-app notification (fire-and-forget)
+      const [buyer] = await db
+        .select({ email: schema.users.email })
+        .from(schema.users)
+        .innerJoin(schema.orders, eq(schema.orders.buyerId, schema.users.id))
+        .where(eq(schema.orders.id, row.sub.orderId))
+        .limit(1)
+      if (buyer) {
+        void enqueueEmail({
+          template: "order_status",
+          to: buyer.email,
+          payload: { orderNumber: row.orderNumber, status: data.status },
+          dedupeKey: `email:order_status:${data.subOrderId}:${data.status}`,
+        })
+      }
+      void enqueueNotification({
+        userId: row.buyerId,
+        kind: "order_status",
+        title: `Order ${row.orderNumber} ${data.status}`,
+        body: `${row.shopName}: ${data.status}`,
+        link: `/account/orders/${row.sub.orderId}`,
+        dedupeKey: `notify:order_status:${data.subOrderId}:${data.status}`,
       })
       return { status: data.status }
     }),

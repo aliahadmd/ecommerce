@@ -1,6 +1,7 @@
 
-import { schema, and, eq, inArray, sql  } from "@ecommerce/db"
-import type {Tx} from "@ecommerce/db";
+import { db, schema, and, eq, inArray, sql } from "@ecommerce/db"
+import { enqueueNotification } from "@ecommerce/jobs"
+import type { Tx } from "@ecommerce/db"
 
 /**
  * Aggregate-maintenance helpers. SERVER-ONLY: these reference the drizzle
@@ -100,4 +101,28 @@ export async function recomputeOrderStatus(
     .update(schema.orders)
     .set({ status: derived })
     .where(eq(schema.orders.id, orderId))
+}
+
+/**
+ * Notify every user who wishlisted a product that it's back in stock
+ * (plan-6). Enqueues in-app notifications + a back_in_stock email.
+ */
+export async function notifyBackInStock(
+  productId: string,
+  productTitle: string
+): Promise<void> {
+  const watchers = await db
+    .select({ userId: schema.wishlistItems.userId })
+    .from(schema.wishlistItems)
+    .where(eq(schema.wishlistItems.productId, productId))
+  for (const w of watchers) {
+    await enqueueNotification({
+      userId: w.userId,
+      kind: "back_in_stock",
+      title: `${productTitle} is back in stock`,
+      body: null,
+      link: `/products/${productId}`,
+      dedupeKey: `back_in_stock:${productId}:${w.userId}`,
+    })
+  }
 }
