@@ -35,6 +35,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ProductsIndexRouteImport } from './routes/products/index'
 import { Route as ProductsSlugRouteImport } from './routes/products/$slug'
 import { Route as SellerIndexRouteImport } from './routes/seller.index'
+import { Route as SellerImportRouteImport } from './routes/seller/import'
 import { Route as SellerOnboardingRouteImport } from './routes/seller.onboarding'
 import { Route as SellerOrdersRouteImport } from './routes/seller/orders'
 import { Route as SellerPayoutsRouteImport } from './routes/seller/payouts'
@@ -179,6 +180,11 @@ const SellerIndexRoute = SellerIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SellerRoute,
 } as any)
+const SellerImportRoute = SellerImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => SellerRoute,
+} as any)
 const SellerOnboardingRoute = SellerOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -268,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
   '/seller/payouts': typeof SellerPayoutsRoute
@@ -307,6 +314,7 @@ export interface FileRoutesByTo {
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
   '/seller/payouts': typeof SellerPayoutsRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
   '/products/$slug': typeof ProductsSlugRoute
+  '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
   '/seller/payouts': typeof SellerPayoutsRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin/types'
     | '/api/health'
     | '/products/$slug'
+    | '/seller/import'
     | '/seller/onboarding'
     | '/seller/orders'
     | '/seller/payouts'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/admin/types'
     | '/api/health'
     | '/products/$slug'
+    | '/seller/import'
     | '/seller/onboarding'
     | '/seller/orders'
     | '/seller/payouts'
@@ -472,6 +483,7 @@ export interface FileRouteTypes {
     | '/admin/types'
     | '/api/health'
     | '/products/$slug'
+    | '/seller/import'
     | '/seller/onboarding'
     | '/seller/orders'
     | '/seller/payouts'
@@ -700,6 +712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SellerIndexRouteImport
       parentRoute: typeof SellerRoute
     }
+    '/seller/import': {
+      id: '/seller/import'
+      path: '/import'
+      fullPath: '/seller/import'
+      preLoaderRoute: typeof SellerImportRouteImport
+      parentRoute: typeof SellerRoute
+    }
     '/seller/onboarding': {
       id: '/seller/onboarding'
       path: '/onboarding'
@@ -831,6 +850,7 @@ const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
 )
 
 interface SellerRouteChildren {
+  SellerImportRoute: typeof SellerImportRoute
   SellerOnboardingRoute: typeof SellerOnboardingRoute
   SellerOrdersRoute: typeof SellerOrdersRoute
   SellerPayoutsRoute: typeof SellerPayoutsRoute
@@ -842,6 +862,7 @@ interface SellerRouteChildren {
 }
 
 const SellerRouteChildren: SellerRouteChildren = {
+  SellerImportRoute: SellerImportRoute,
   SellerOnboardingRoute: SellerOnboardingRoute,
   SellerOrdersRoute: SellerOrdersRoute,
   SellerPayoutsRoute: SellerPayoutsRoute,

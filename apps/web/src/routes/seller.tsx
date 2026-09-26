@@ -46,6 +46,13 @@ function SellerLayout() {
           Payouts
         </Link>
         <Link
+          to="/seller/import"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Import
+        </Link>
+        <Link
           to="/seller/reviews"
           className="rounded-md px-3 py-1.5 hover:bg-muted"
           activeProps={{ className: "bg-muted font-medium" }}
