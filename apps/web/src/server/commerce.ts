@@ -528,6 +528,41 @@ export const placeOrder = createServerFn({ method: "POST" })
         await tx
           .insert(schema.orderItems)
           .values(orderItems.map((i) => ({ ...i, orderId: order.id })))
+        // Per-shop sub-orders (plan-2): one per distinct shop; shipping goes
+        // to the first sub-order so cents sum exactly.
+        const byShop = new Map<string, typeof orderItems>()
+        for (const item of orderItems) {
+          const list = byShop.get(item.shopId) ?? []
+          list.push(item)
+          byShop.set(item.shopId, list)
+        }
+        let shippingLeft = shippingFeeCents
+        for (const [shopId, items] of byShop) {
+          const sub = items.reduce((sum, i) => sum + i.totalCents, 0)
+          const shipShare = Math.min(shippingLeft, shippingFeeCents)
+          shippingLeft -= shipShare
+          const [subOrder] = await tx
+            .insert(schema.subOrders)
+            .values({
+              orderId: order.id,
+              shopId,
+              status: "pending",
+              subtotalCents: sub,
+              shippingCents: shipShare,
+              discountCents: 0,
+              totalCents: sub + shipShare,
+            })
+            .returning({ id: schema.subOrders.id })
+          await tx
+            .update(schema.orderItems)
+            .set({ subOrderId: subOrder.id })
+            .where(
+              and(
+                eq(schema.orderItems.orderId, order.id),
+                eq(schema.orderItems.shopId, shopId),
+              ),
+            )
+        }
         await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))

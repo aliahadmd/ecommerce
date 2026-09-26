@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { formatMoney } from "@ecommerce/config"
-import { getOrderDetail, listShopOrders } from "@/server/commerce"
+import { getSubOrderDetail, listShopSubOrders } from "@/server/sub-orders"
 import { unwrap } from "@/lib/unwrap"
-import { OrderActions } from "@/components/order-actions"
+import { SubOrderActions } from "@/components/sub-order-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -22,16 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { useState } from "react"
-
 export const Route = createFileRoute("/seller/orders")({
   loader: async ({ context: { queryClient } }) => {
     await queryClient.ensureQueryData({
-      queryKey: ["shop-orders"],
-      queryFn: () => listShopOrders().then(unwrap),
+      queryKey: ["shop-sub-orders"],
+      queryFn: () => listShopSubOrders().then(unwrap),
     })
   },
-  component: SellerOrdersPage,
+  component: SellerSubOrdersPage,
 })
 
 const statusVariant = (s: string) =>
@@ -41,11 +39,29 @@ const statusVariant = (s: string) =>
       ? "destructive"
       : "secondary"
 
-function SellerOrdersPage() {
+interface SubOrderRow {
+  id: string
+  orderNumber: string
+  status: Status
+  totalCents: number
+  currency: string
+  buyerName: string
+  createdAt: string | Date
+  itemCount: number
+}
+
+type Status = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
+
+function SellerSubOrdersPage() {
+  const queryClient = useQueryClient()
   const { data: orders } = useQuery({
-    queryKey: ["shop-orders"],
-    queryFn: () => listShopOrders().then(unwrap),
+    queryKey: ["shop-sub-orders"],
+    queryFn: () => listShopSubOrders().then(unwrap),
   })
+
+  function refresh() {
+    void queryClient.invalidateQueries({ queryKey: ["shop-sub-orders"] })
+  }
 
   return (
     <div>
@@ -56,23 +72,20 @@ function SellerOrdersPage() {
             <TableRow>
               <TableHead>Order</TableHead>
               <TableHead>Buyer</TableHead>
+              <TableHead>Items</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Payment</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(orders ?? []).map((o) => (
-              <SellerOrderRow key={o.id} order={o} />
+              <SellerSubOrderRow key={o.id} row={o} onChanged={refresh} />
             ))}
             {orders?.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-12 text-center text-muted-foreground"
-                >
-                  No orders containing your products yet.
+                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                  No sub-orders yet.
                 </TableCell>
               </TableRow>
             )}
@@ -83,84 +96,60 @@ function SellerOrdersPage() {
   )
 }
 
-function SellerOrderRow({
-  order,
+function SellerSubOrderRow({
+  row,
+  onChanged,
 }: {
-  order: {
-    id: string
-    orderNumber: string
-    status: string
-    paymentStatus: string
-    totalCents: number
-    currency: string
-    buyerName: string
-    createdAt: string | Date
-  }
+  row: SubOrderRow & { currency: string }
+  onChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
   const { data: detail } = useQuery({
-    queryKey: ["order-detail", order.id],
-    queryFn: () => getOrderDetail({ data: { id: order.id } }).then(unwrap),
+    queryKey: ["sub-order-detail", row.id],
+    queryFn: () => getSubOrderDetail({ data: { id: row.id } }).then(unwrap),
     enabled: open,
   })
 
   return (
     <TableRow>
       <TableCell>
-        <button
-          className="font-medium hover:underline"
-          onClick={() => setOpen(true)}
-        >
-          {order.orderNumber}
+        <button className="font-medium hover:underline" onClick={() => setOpen(true)}>
+          {row.orderNumber}
         </button>
         <p className="text-xs text-muted-foreground">
-          {new Date(order.createdAt).toLocaleString()}
+          {new Date(row.createdAt).toLocaleString()}
         </p>
       </TableCell>
-      <TableCell>{order.buyerName}</TableCell>
+      <TableCell>{row.buyerName}</TableCell>
+      <TableCell>{row.itemCount} item(s)</TableCell>
       <TableCell>
-        <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
-      </TableCell>
-      <TableCell>
-        <Badge variant={order.paymentStatus === "paid" ? "default" : "outline"}>
-          {order.paymentStatus}
-        </Badge>
+        <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
       </TableCell>
       <TableCell className="text-right">
-        {formatMoney(order.totalCents, order.currency)}
+        {formatMoney(row.totalCents, row.currency)}
       </TableCell>
-      <TableCell>
-        <OrderActions
-          orderId={order.id}
-          status={order.status as OrderStatusAlias}
-          paymentStatus={order.paymentStatus}
-          role="seller"
-        />
+      <TableCell className="text-right">
+        <SubOrderActions subOrderId={row.id} status={row.status} role="seller" onChanged={onChanged} />
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Order {order.orderNumber}</DialogTitle>
+              <DialogTitle>Order {row.orderNumber}</DialogTitle>
             </DialogHeader>
             {detail && (
-              <Card>
-                <CardContent className="space-y-2 py-4 text-sm">
-                  {detail.items.map((i) => (
-                    <div key={i.id} className="flex justify-between">
-                      <span>
-                        {i.title} × {i.quantity}
-                      </span>
-                      <span>
-                        {formatMoney(i.totalCents, detail.order.currency)}
-                      </span>
-                    </div>
-                  ))}
-                  <p className="pt-2 text-muted-foreground">
-                    Deliver to: {detail.order.shipName},{" "}
-                    {detail.order.shipLine1}, {detail.order.shipCity} ·{" "}
-                    {detail.order.shipPhone}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="space-y-2 text-sm">
+                {detail.items.map((i) => (
+                  <div key={i.id} className="flex justify-between">
+                    <span>
+                      {i.title}
+                      {i.variantTitle ? ` — ${i.variantTitle}` : ""} × {i.quantity}
+                    </span>
+                    <span>{formatMoney(i.totalCents, row.currency)}</span>
+                  </div>
+                ))}
+                <p className="pt-2 text-muted-foreground">
+                  Ship to the buyer address on the parent order.
+                </p>
+              </div>
             )}
             <Button variant="outline" onClick={() => setOpen(false)}>
               Close
@@ -171,5 +160,3 @@ function SellerOrderRow({
     </TableRow>
   )
 }
-
-type OrderStatusAlias = Parameters<typeof OrderActions>[0]["status"]

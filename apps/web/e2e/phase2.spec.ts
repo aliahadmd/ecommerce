@@ -175,8 +175,6 @@ test("order: buyer checkout → seller fulfills", async ({ page }) => {
   await page.getByRole("button", { name: "Ship" }).first().click()
   await page.waitForTimeout(800)
   await page.getByRole("button", { name: "Mark delivered" }).first().click()
-  await page.waitForTimeout(800)
-  await page.getByRole("button", { name: "Mark paid (cash)" }).first().click()
   await page.waitForTimeout(1000)
   await expect(page.getByText("delivered").first()).toBeVisible()
 })

@@ -58,3 +58,46 @@ export async function recomputeProductRating(
     })
     .where(eq(schema.products.id, productId))
 }
+
+const SUB_ORDER_RANK: Record<string, number> = {
+  pending: 0,
+  confirmed: 1,
+  shipped: 2,
+  delivered: 3,
+}
+
+/**
+ * Derive the parent order's status from its sub-orders (plan-2).
+ * All cancelled → cancelled; all delivered → delivered; otherwise the
+ * earliest active stage.
+ */
+export async function recomputeOrderStatus(
+  tx: Tx,
+  orderId: string,
+): Promise<void> {
+  const statuses = await tx
+    .select({ status: schema.subOrders.status })
+    .from(schema.subOrders)
+    .where(eq(schema.subOrders.orderId, orderId))
+  if (statuses.length === 0) return
+  const list = statuses.map((s) => s.status)
+  let derived: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
+  if (list.every((s) => s === "cancelled")) {
+    derived = "cancelled"
+  } else {
+    const active = list.filter((s) => s !== "cancelled")
+    if (active.every((s) => s === "delivered")) derived = "delivered"
+    else {
+      derived = "pending"
+      for (const st of active) {
+        if (SUB_ORDER_RANK[st] < SUB_ORDER_RANK[derived]) {
+          derived = st as typeof derived
+        }
+      }
+    }
+  }
+  await tx
+    .update(schema.orders)
+    .set({ status: derived })
+    .where(eq(schema.orders.id, orderId))
+}

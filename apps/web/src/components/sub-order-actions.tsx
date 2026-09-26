@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { toast } from "sonner"
-import { markOrderPaid, updateOrderStatus } from "@/server/commerce"
-import type { OrderStatus } from "@/lib/order-machine"
+import { updateSubOrderStatus } from "@/server/sub-orders"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,21 +12,21 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 
+type Status = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
+
 /**
- * Renders the legal next actions for an order given the viewer role
- * (server re-validates everything — plan-8 matrix).
+ * Sub-order fulfillment actions (plan-2): confirm → ship → delivered,
+ * cancel with reason while pending/confirmed. Server re-validates the matrix.
  */
-export function OrderActions({
-  orderId,
+export function SubOrderActions({
+  subOrderId,
   status,
-  paymentStatus,
   role,
   onChanged,
 }: {
-  orderId: string
-  status: OrderStatus
-  paymentStatus: string
-  role: "super_admin" | "seller" | "buyer"
+  subOrderId: string
+  status: Status
+  role: "seller" | "admin" | "buyer"
   onChanged?: () => void
 }) {
   const queryClient = useQueryClient()
@@ -35,32 +34,25 @@ export function OrderActions({
   const [reason, setReason] = useState("")
 
   function refresh() {
-    void queryClient.invalidateQueries({ queryKey: ["shop-orders"] })
+    void queryClient.invalidateQueries({ queryKey: ["shop-sub-orders"] })
     void queryClient.invalidateQueries({ queryKey: ["admin-orders"] })
     void queryClient.invalidateQueries({ queryKey: ["my-orders"] })
+    void queryClient.invalidateQueries({ queryKey: ["my-order"] })
     onChanged?.()
   }
 
   const transition = useMutation({
-    mutationFn: (input: { status: OrderStatus; reason?: string }) =>
-      updateOrderStatus({
-        data: { orderId, status: input.status, reason: input.reason },
+    mutationFn: (input: { status: Status; reason?: string }) =>
+      updateSubOrderStatus({
+        data: { subOrderId, status: input.status, reason: input.reason },
       }),
     onSuccess: (r, vars) => {
       if (!r.ok) {
         toast.error(r.error.message)
         return
       }
-      toast.success(`Order ${vars.status}`)
+      toast.success(`Sub-order ${vars.status}`)
       setCancelling(false)
-      refresh()
-    },
-  })
-  const markPaid = useMutation({
-    mutationFn: () => markOrderPaid({ data: { orderId } }),
-    onSuccess: (r) => {
-      if (!r.ok) toast.error(r.error.message)
-      else toast.success("Payment recorded")
       refresh()
     },
   })
@@ -70,64 +62,30 @@ export function OrderActions({
 
   if (status === "pending" && role !== "buyer") {
     buttons.push(
-      <Button
-        key="confirm"
-        size="xs"
-        onClick={() => transition.mutate({ status: "confirmed" })}
-      >
+      <Button key="confirm" size="xs" onClick={() => transition.mutate({ status: "confirmed" })}>
         Confirm
-      </Button>
+      </Button>,
     )
   }
   if (status === "confirmed" && role !== "buyer") {
     buttons.push(
-      <Button
-        key="ship"
-        size="xs"
-        onClick={() => transition.mutate({ status: "shipped" })}
-      >
+      <Button key="ship" size="xs" onClick={() => transition.mutate({ status: "shipped" })}>
         Ship
-      </Button>
+      </Button>,
     )
   }
   if (status === "shipped" && role !== "buyer") {
     buttons.push(
-      <Button
-        key="deliver"
-        size="xs"
-        onClick={() => transition.mutate({ status: "delivered" })}
-      >
+      <Button key="deliver" size="xs" onClick={() => transition.mutate({ status: "delivered" })}>
         Mark delivered
-      </Button>
-    )
-  }
-  if (
-    (status === "delivered" &&
-      role !== "buyer" &&
-      paymentStatus === "unpaid") ||
-    (role === "super_admin" && paymentStatus === "unpaid")
-  ) {
-    buttons.push(
-      <Button
-        key="paid"
-        size="xs"
-        variant="secondary"
-        onClick={() => markPaid.mutate()}
-      >
-        Mark paid (cash)
-      </Button>
+      </Button>,
     )
   }
   if (status === "pending" || status === "confirmed") {
     buttons.push(
-      <Button
-        key="cancel"
-        size="xs"
-        variant="outline"
-        onClick={() => setCancelling(true)}
-      >
+      <Button key="cancel" size="xs" variant="outline" onClick={() => setCancelling(true)}>
         Cancel
-      </Button>
+      </Button>,
     )
   }
 
@@ -137,7 +95,7 @@ export function OrderActions({
       <Dialog open={cancelling} onOpenChange={setCancelling}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel this order?</DialogTitle>
+            <DialogTitle>Cancel this sub-order?</DialogTitle>
           </DialogHeader>
           <Textarea
             placeholder="Reason (required) — e.g. changed my mind, out of stock…"
@@ -151,14 +109,9 @@ export function OrderActions({
             <Button
               variant="destructive"
               disabled={!reason.trim()}
-              onClick={() =>
-                transition.mutate({
-                  status: "cancelled",
-                  reason: reason.trim(),
-                })
-              }
+              onClick={() => transition.mutate({ status: "cancelled", reason: reason.trim() })}
             >
-              Cancel order
+              Cancel sub-order
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { listAllOrders } from "@/server/commerce"
 import { unwrap } from "@/lib/unwrap"
-import { OrderActions } from "@/components/order-actions"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -75,13 +74,8 @@ function AdminOrdersPage() {
                 <TableCell className="text-right">
                   {formatMoney(o.totalCents, o.currency)}
                 </TableCell>
-                <TableCell>
-                  <OrderActions
-                    orderId={o.id}
-                    status={o.status}
-                    paymentStatus={o.paymentStatus}
-                    role="super_admin"
-                  />
+                <TableCell className="text-xs text-muted-foreground">
+                  fulfill via sub-orders
                 </TableCell>
               </TableRow>
             ))}
