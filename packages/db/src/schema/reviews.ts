@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -38,6 +39,11 @@ export const reviews = pgTable(
     sellerReply: text("seller_reply"),
     sellerRepliedAt: timestamp("seller_replied_at", { withTimezone: true }),
     helpfulCount: integer("helpful_count").notNull().default(0),
+    photos: jsonb("photos")
+      .$type<{ key: string; url: string }[]>()
+      .notNull()
+      .default([]),
+    reportedAt: timestamp("reported_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -69,4 +75,21 @@ export const reviewVotes = pgTable(
       .defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.reviewId, t.userId] })],
+)
+
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.userId] })]
 )

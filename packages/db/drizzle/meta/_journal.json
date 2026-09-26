@@ -141,6 +141,13 @@
       "when": 1790452846424,
       "tag": "0019_exotic_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790462204266,
+      "tag": "0020_blue_the_phantom",
+      "breakpoints": true
     }
   ]
 }

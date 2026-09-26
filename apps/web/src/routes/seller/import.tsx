@@ -43,7 +43,7 @@ function ImportPage() {
         errors: r.errors,
       })
     },
-    onError: (e) => toast.error((e as Error).message),
+    onError: (e) => toast.error(e.message),
   })
 
   const commit = useMutation({

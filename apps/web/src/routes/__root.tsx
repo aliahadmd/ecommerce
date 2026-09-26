@@ -11,7 +11,10 @@ import appCss from "../styles.css?url"
 import type { QueryClient } from "@tanstack/react-query"
 import { Header } from "@/components/site-header"
 import { Toaster } from "@/components/ui/sonner"
+import { unwrap } from "@/lib/unwrap"
 import { getSession } from "@/server/session"
+import { getStoreSettings } from "@/server/settings"
+import { useQuery } from "@tanstack/react-query"
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
@@ -59,10 +62,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { session } = Route.useRouteContext()
+  const settingsQuery = useQuery({
+    queryKey: ["store-settings-public"],
+    queryFn: () => getStoreSettings().then(unwrap),
+    staleTime: 30_000,
+  })
+  const storeSettings = settingsQuery.data
+  const isAdmin = session?.role === "super_admin"
+  const maintenance = storeSettings?.mode === "maintenance" && !isAdmin
   return (
     <>
       <Header user={session} />
-      <Outlet />
+      {maintenance ? (
+        <main className="flex min-h-svh flex-col items-center justify-center gap-2 px-4 text-center">
+          <h1 className="text-2xl font-bold">We'll be right back</h1>
+          <p className="text-muted-foreground max-w-md text-sm">
+            The store is temporarily closed for maintenance.
+            {storeSettings?.contactEmail ? ` Questions? ${storeSettings.contactEmail}` : ""}
+          </p>
+        </main>
+      ) : (
+        <Outlet />
+      )}
       <Toaster position="bottom-right" richColors />
     </>
   )

@@ -97,7 +97,7 @@ function rowToParsed(rowNumber: number, r: Record<string, string>): ParsedRow | 
       : "new",
     priceCents,
     stock,
-    status: ["draft", "active", "archived"].includes(r.status) ? (r.status as string) : "draft",
+    status: ["draft", "active", "archived"].includes(r.status) ? r.status : "draft",
     variantTitle: r.variant_title || null,
     variantSku: r.variant_sku || null,
   }
