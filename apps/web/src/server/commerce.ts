@@ -383,6 +383,33 @@ export const placeOrder = createServerFn({ method: "POST" })
       const shippingFeeCents = env.SHIPPING_FEE_CENTS
       const currency = env.CURRENCY
 
+      // Coupon pre-validation (plan-4): re-check window/limits/scope and
+      // compute the discount. Final validation + redemption happen in-tx.
+      let couponId: string | null = null
+      let discountCents = 0
+      {
+        const [cartRow] = await db
+          .select({ couponId: schema.carts.couponId })
+          .from(schema.carts)
+          .where(eq(schema.carts.id, cart.id))
+          .limit(1)
+        if (cartRow?.couponId) {
+          const { validateCouponForCheckout } = await import("./coupons")
+          const subtotal = items.reduce(
+            (sum, i) => sum + i.priceCents * i.quantity,
+            0
+          )
+          const shopIds = [...new Set(items.map((i) => i.shopId))]
+          discountCents = await validateCouponForCheckout(
+            cartRow.couponId,
+            user.id,
+            subtotal,
+            shopIds
+          )
+          couponId = cartRow.couponId
+        }
+      }
+
       const result = await db.transaction(async (tx) => {
         let subtotalCents = 0
         const orderItems: (typeof schema.orderItems.$inferInsert)[] = []
@@ -501,7 +528,8 @@ export const placeOrder = createServerFn({ method: "POST" })
                 paymentStatus: "unpaid",
                 subtotalCents,
                 shippingFeeCents,
-                totalCents: subtotalCents + shippingFeeCents,
+                discountCents,
+                totalCents: subtotalCents + shippingFeeCents - discountCents,
                 currency,
                 shipName: address.fullName,
                 shipPhone: address.phone,
@@ -525,22 +553,32 @@ export const placeOrder = createServerFn({ method: "POST" })
           }
         }
 
-        await tx
-          .insert(schema.orderItems)
-          .values(orderItems.map((i) => ({ ...i, orderId: order.id })))
+
         // Per-shop sub-orders (plan-2): one per distinct shop; shipping goes
         // to the first sub-order so cents sum exactly.
-        const byShop = new Map<string, typeof orderItems>()
+        type ItemInsert = (typeof orderItems)[number]
+        const byShop = new Map<string, ItemInsert[]>()
         for (const item of orderItems) {
-          const list = byShop.get(item.shopId) ?? []
+          const list: ItemInsert[] = byShop.get(item.shopId) ?? []
           list.push(item)
           byShop.set(item.shopId, list)
         }
         let shippingLeft = shippingFeeCents
+        let discountLeft = discountCents
+        let subOrderIdx = 0
         for (const [shopId, items] of byShop) {
-          const sub = items.reduce((sum, i) => sum + i.totalCents, 0)
+          const sub = items.reduce(
+            (sum, i) => sum + i.totalCents,
+            0
+          )
           const shipShare = Math.min(shippingLeft, shippingFeeCents)
           shippingLeft -= shipShare
+          const isLast = subOrderIdx === byShop.size - 1
+          const discountShare = isLast
+            ? discountLeft
+            : Math.floor((sub / Math.max(1, subtotalCents)) * discountCents)
+          discountLeft -= discountShare
+          subOrderIdx += 1
           const [subOrder] = await tx
             .insert(schema.subOrders)
             .values({
@@ -549,8 +587,8 @@ export const placeOrder = createServerFn({ method: "POST" })
               status: "pending",
               subtotalCents: sub,
               shippingCents: shipShare,
-              discountCents: 0,
-              totalCents: sub + shipShare,
+              discountCents: discountShare,
+              totalCents: sub + shipShare - discountShare,
             })
             .returning({ id: schema.subOrders.id })
           await tx
@@ -566,6 +604,33 @@ export const placeOrder = createServerFn({ method: "POST" })
         await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))
+        if (couponId) {
+          // per-user limit enforced inside the tx (race-safe with the unique
+          // per-user constraints of the flow)
+          const [{ mine }] = await tx
+            .select({ mine: sql<number>`count(*)::int` })
+            .from(schema.couponRedemptions)
+            .where(
+              and(
+                eq(schema.couponRedemptions.couponId, couponId),
+                eq(schema.couponRedemptions.userId, user.id)
+              )
+            )
+          const [coupon] = await tx
+            .select({ maxUsesPerUser: schema.coupons.maxUsesPerUser, maxUses: schema.coupons.maxUses })
+            .from(schema.coupons)
+            .where(eq(schema.coupons.id, couponId))
+            .limit(1)
+          if (!coupon || mine >= coupon.maxUsesPerUser) {
+            throw new AppError("INVALID", "You already used this coupon")
+          }
+          await tx.insert(schema.couponRedemptions).values({
+            couponId,
+            userId: user.id,
+            orderId: order.id,
+            amountCents: discountCents,
+          })
+        }
         // keep product price/stock aggregates honest after variant stock moves
         for (const pid of variantProductIds) {
           await recomputeProductAggregates(tx, pid)

@@ -15,7 +15,7 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
     if (method !== "cod" && method !== "card") {
       throw new AppError("INVALID", "Invalid payment method")
     }
-    return { orderId, method: method as "cod" | "card" }
+    return { orderId, method: method }
   })
   .handler(({ data }) =>
     guard(async () => {
@@ -41,7 +41,7 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
             payUrl: provider.id === FAKE ? `/checkout/pay/${existing.providerRef}` : "",
           }
         }
-        return { method: existing.method as "cod" | "card", payUrl: "" }
+        return { method: existing.method, payUrl: "" }
       }
 
       if (data.method === "cod") {

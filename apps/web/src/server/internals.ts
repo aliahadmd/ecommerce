@@ -91,7 +91,7 @@ export async function recomputeOrderStatus(
       derived = "pending"
       for (const st of active) {
         if (SUB_ORDER_RANK[st] < SUB_ORDER_RANK[derived]) {
-          derived = st as typeof derived
+          derived = st
         }
       }
     }

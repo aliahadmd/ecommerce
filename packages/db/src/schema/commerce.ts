@@ -36,6 +36,7 @@ export const carts = pgTable("carts", {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
+  couponId: uuid("coupon_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
@@ -109,6 +110,7 @@ export const orders = pgTable(
     paymentStatus: paymentStatus("payment_status").notNull().default("unpaid"),
     subtotalCents: integer("subtotal_cents").notNull(),
     shippingFeeCents: integer("shipping_fee_cents").notNull().default(0),
+    discountCents: integer("discount_cents").notNull().default(0),
     totalCents: integer("total_cents").notNull(),
     currency: char("currency", { length: 3 }).notNull().default("USD"),
     // Address snapshot — survives address edits/deletions

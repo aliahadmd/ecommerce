@@ -6,4 +6,5 @@ export * from "./attributes"
 export * from "./variants"
 export * from "./reviews"
 export * from "./sub-orders"
-export * from "./payments";
+export * from "./payments"
+export * from "./coupons";

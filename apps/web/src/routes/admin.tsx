@@ -55,6 +55,13 @@ function AdminLayout() {
           Orders
         </Link>
         <Link
+          to="/admin/coupons"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Coupons
+        </Link>
+        <Link
           to="/admin/reviews"
           className="rounded-md px-3 py-1.5 hover:bg-muted"
           activeProps={{ className: "bg-muted font-medium" }}

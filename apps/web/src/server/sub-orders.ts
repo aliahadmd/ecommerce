@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { db, schema, desc, eq, inArray, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { recomputeOrderStatus } from "./internals"
-import { canTransition, type OrderStatus } from "@/lib/order-machine"
+import { canTransition  } from "@/lib/order-machine"
+import type {OrderStatus} from "@/lib/order-machine";
 
 async function loadSubOrder(subOrderId: string) {
   const [row] = await db

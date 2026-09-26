@@ -113,6 +113,20 @@
       "when": 1790448540372,
       "tag": "0015_clever_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790450311101,
+      "tag": "0016_kind_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790450618828,
+      "tag": "0017_exotic_vargas",
+      "breakpoints": true
     }
   ]
 }

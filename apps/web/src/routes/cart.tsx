@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { toast } from "sonner"
 import { getCart, removeCartItem, updateCartItem } from "@/server/commerce"
+import { applyCoupon, getAppliedCoupon, removeCoupon } from "@/server/coupons"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Button } from "@/components/ui/button"
@@ -44,6 +45,26 @@ function CartPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+  const applyCode = useMutation({
+    mutationFn: (code: string) => applyCoupon({ data: { code } }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else toast.success(`Coupon ${r.data.code} applied`)
+      void queryClient.invalidateQueries({ queryKey: ["coupon"] })
+    },
+  })
+  const removeCode = useMutation({
+    mutationFn: () => removeCoupon(),
+    onSuccess: () => {
+      toast.success("Coupon removed")
+      void queryClient.invalidateQueries({ queryKey: ["coupon"] })
+    },
+  })
+  const { data: applied } = useQuery({
+    queryKey: ["coupon"],
+    queryFn: () => getAppliedCoupon().then((r) => (r.ok ? r.data : null)),
+  })
+
   const update = useMutation({
     mutationFn: (input: { itemId: string; quantity: number }) =>
       updateCartItem({ data: input }),
@@ -174,6 +195,34 @@ function CartPage() {
               )}
             </span>
           </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const code = String(new FormData(e.currentTarget).get("code") ?? "").trim()
+              if (code) applyCode.mutate(code)
+              e.currentTarget.reset()
+            }}
+          >
+            <Input name="code" placeholder="Coupon code" className="max-w-40" />
+            <Button type="submit" variant="outline" size="sm" disabled={applyCode.isPending}>
+              Apply
+            </Button>
+          </form>
+          {applied && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-green-600 dark:text-green-400">
+                Coupon {applied.code} applied
+                <button className="ml-2 underline" onClick={() => removeCode.mutate()}>
+                  remove
+                </button>
+              </span>
+              <span>
+                -
+                {formatMoney(applied.discountCents, cart.items[0]?.currency ?? "USD")}
+              </span>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             Payment: cash on delivery — you pay when the order arrives.
           </p>
