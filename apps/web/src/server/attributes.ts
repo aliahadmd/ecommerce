@@ -412,7 +412,7 @@ export const setProductAttributes = createServerFn({ method: "POST" })
       if (product.status === "active") {
         const provided = new Set(rows.map((r) => r.attributeId))
         const missing = defs.filter(
-          (d) => d.required && !provided.has(d.id) && !rows.some((r) => r.attributeId === d.id),
+          (d) => d.required && !provided.has(d.id)
         )
         if (missing.length > 0) {
           throw new AppError(

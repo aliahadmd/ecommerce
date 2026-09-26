@@ -278,6 +278,11 @@ function SellerProductsPage() {
           variant="outline"
           onClick={async () => {
             const res = await exportProductsCsv()
+            const ct = res.headers.get("content-type") ?? ""
+            if (!res.ok || !ct.includes("text/csv")) {
+              toast.error("Export failed — please retry")
+              return
+            }
             const blob = await res.blob()
             const url = URL.createObjectURL(blob)
             const a = document.createElement("a")

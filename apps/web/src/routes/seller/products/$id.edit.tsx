@@ -29,6 +29,8 @@ function EditProductPage() {
   const queryClient = useQueryClient()
   const [pending, setPending] = useState(false)
 
+  const [variantCount, setVariantCount] = useState<number | null>(null)
+
   const { data, isError, error } = useQuery({
     queryKey: ["product-edit", id],
     queryFn: () => getProductForEdit({ data: { id } }).then(unwrap),
@@ -58,7 +60,6 @@ function EditProductPage() {
   }
 
   const { product, images, tagIds, attributes } = data
-  const [variantCount, setVariantCount] = useState<number | null>(null)
 
   return (
     <Card className="mx-auto max-w-2xl">

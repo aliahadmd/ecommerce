@@ -180,3 +180,46 @@ test("order: buyer checkout → seller fulfills", async ({ page }) => {
   await page.waitForTimeout(1000)
   await expect(page.getByText("delivered").first()).toBeVisible()
 })
+
+test("facets: click attribute facet → URL updates → filtered results", async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.goto("/products?category=fashion")
+  await page.waitForTimeout(3000)
+  // Material facet should list Merino (seeded on the beanie)
+  const materialLabel = page.locator("aside label", { hasText: "Merino" }).first()
+  await expect(materialLabel).toBeVisible({ timeout: 10_000 })
+  await materialLabel.locator("button, input, [role=checkbox], [data-slot=checkbox]").first().click({ force: true })
+  await page.waitForTimeout(2500)
+  await expect(page.getByText(/results/)).toBeVisible({ timeout: 15_000 })
+  // the filtered page must not error and must include the beanie
+  await expect(page.getByText(/Merino Wool Beanie/).first()).toBeVisible({ timeout: 15_000 })
+})
+
+test("seller: generate variants from type axes", async ({ page }) => {
+  test.setTimeout(90_000)
+  // fresh user opens a shop, creates a product of an axe type, generates variants
+  await registerAndLogin(page, "Gabe Generate")
+  await page.goto("/seller/onboarding")
+  await page.waitForTimeout(2000)
+  await page.getByLabel("Shop name").fill("Variant Forge")
+  await page.getByRole("button", { name: "Create shop" }).click()
+  await expect(page.getByText(/welcome aboard/i)).toBeVisible({ timeout: 15_000 })
+  await page.goto("/seller/products/new")
+  await page.waitForTimeout(2000)
+  await page.locator("#title").fill("Forge Test Tee")
+  await page.locator("#price").fill("18")
+  await page.locator("#stock").fill("30")
+  await page.locator("#description").fill("A generated-variant test product for the e2e suite.")
+  // pick the Apparel type (has Size + Color axes)
+  const typeTrigger = page.getByText("Product type").locator("..").getByRole("combobox").first()
+  await typeTrigger.click()
+  await page.getByRole("option", { name: "Apparel" }).click()
+  await page.waitForTimeout(500)
+  await page.getByRole("button", { name: "Create product" }).click()
+  await expect(page.getByText(/Product created/)).toBeVisible({ timeout: 15_000 })
+  // on the edit page: generate variants
+  await page.getByRole("button", { name: "Generate combinations" }).click()
+  await expect(page.getByText(/variant\(s\) generated/)).toBeVisible({ timeout: 15_000 })
+  // cart shows variant rows
+  await expect(page.getByText("S / Black").first()).toBeVisible({ timeout: 10_000 })
+})

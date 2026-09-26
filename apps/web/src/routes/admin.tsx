@@ -40,6 +40,13 @@ function AdminLayout() {
           Catalog
         </Link>
         <Link
+          to="/admin/products"
+          className="rounded-md px-3 py-1.5 hover:bg-muted"
+          activeProps={{ className: "bg-muted font-medium" }}
+        >
+          Products
+        </Link>
+        <Link
           to="/admin/orders"
           search={{}}
           className="rounded-md px-3 py-1.5 hover:bg-muted"

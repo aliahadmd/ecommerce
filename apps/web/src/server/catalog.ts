@@ -6,9 +6,11 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
+  isNull,
   lte,
   or,
   sql,
@@ -241,6 +243,8 @@ export type ProductFilters = {
   minRating?: number
   /** attribute facet filters: attribute slug → value(s) */
   attributes?: Record<string, string[]>
+  /** variant SKU prefix search */
+  variantSku?: string
 }
 
 const productCardColumns = {
@@ -275,6 +279,7 @@ export const listProducts = createServerFn({ method: "GET" })
       sort: f.sort ?? "newest",
       page: Math.max(1, f.page ?? 1),
       minRating: typeof f.minRating === "number" ? f.minRating : undefined,
+      variantSku: f.variantSku?.slice(0, 40),
       attributes:
         f.attributes && typeof f.attributes === "object"
           ? Object.fromEntries(
@@ -314,6 +319,51 @@ export const listProducts = createServerFn({ method: "GET" })
         conditions.push(
           lte(schema.products.priceCents, Math.round(data.max * 100))
         )
+      if (data.minRating !== undefined) {
+        conditions.push(
+          and(
+            gte(schema.products.ratingAvgX100, Math.round(data.minRating * 100)),
+            gt(schema.products.ratingCount, 0)
+          )!
+        )
+      }
+      if (data.variantSku) {
+        const skuPrefix = `${escapeLike(data.variantSku)}%`
+        conditions.push(
+          sql`EXISTS (
+            SELECT 1 FROM product_variants pv
+            WHERE pv.product_id = ${schema.products.id}
+              AND pv.sku ILIKE ${skuPrefix}
+          )`
+        )
+      }
+      // attribute facets: AND across attributes, OR within one attribute's values
+      if (data.attributes) {
+        for (const [attrSlug, values] of Object.entries(data.attributes)) {
+          if (values.length === 0) continue
+          const [def] = await db
+            .select({ id: schema.attributeDefinitions.id, kind: schema.attributeDefinitions.kind })
+            .from(schema.attributeDefinitions)
+            .where(eq(schema.attributeDefinitions.slug, attrSlug))
+            .limit(1)
+          if (!def) continue
+          // jsonb containment works for every kind: scalar strings, numbers,
+          // booleans, and arrays containing the element
+          const valuePreds = values.map(
+            (v) => sql`pav.value @> ${JSON.stringify(v)}::jsonb`
+          )
+          const anyValue = or(...valuePreds)!
+          conditions.push(
+            sql`EXISTS (
+              SELECT 1 FROM product_attribute_values pav
+              JOIN attribute_definitions ad ON ad.id = pav.attribute_id
+              WHERE pav.product_id = ${schema.products.id}
+                AND ad.id = ${def.id}
+                AND ${anyValue}
+            )`
+          )
+        }
+      }
 
       const where = and(...conditions)
 
@@ -971,23 +1021,6 @@ export const adminListProducts = createServerFn({ method: "GET" })
     })
   )
 
-export const adminListProductsByIds = createServerFn({ method: "GET" })
-  .validator((input: unknown) => {
-    const { ids } = input as { ids?: unknown }
-    if (!Array.isArray(ids)) throw new AppError("INVALID", "ids required")
-    return { ids: ids.map(String) }
-  })
-  .handler(({ data }) =>
-    guard(async () => {
-      await requireRole("super_admin")
-      if (data.ids.length === 0) return []
-      return db
-        .select()
-        .from(schema.products)
-        .where(inArray(schema.products.id, data.ids))
-    })
-  )
-
 // ── Image reordering (plan-2) ───────────────────────────────────────────────
 
 export const reorderProductImages = createServerFn({ method: "POST" })
@@ -1281,12 +1314,30 @@ export const reorderCategories = createServerFn({ method: "POST" })
     const raw = input as { parentId?: unknown; orderedIds?: unknown }
     const orderedIds = Array.isArray(raw.orderedIds) ? raw.orderedIds.map(String) : []
     if (orderedIds.length === 0) throw new AppError("INVALID", "orderedIds required")
+    if (new Set(orderedIds).size !== orderedIds.length) {
+      throw new AppError("INVALID", "Duplicate ids in orderedIds")
+    }
     const parentId = raw.parentId ? String(raw.parentId) : null
     return { parentId, orderedIds }
   })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
+      // validate the set exactly matches the target sibling group
+      const siblings = await db
+        .select({ id: schema.categories.id })
+        .from(schema.categories)
+        .where(
+          data.parentId
+            ? eq(schema.categories.parentId, data.parentId)
+            : isNull(schema.categories.parentId)
+        )
+      if (
+        siblings.length !== data.orderedIds.length ||
+        !data.orderedIds.every((id) => siblings.some((s) => s.id === id))
+      ) {
+        throw new AppError("INVALID", "Order list does not match this sibling group")
+      }
       await db.transaction(async (tx) => {
         for (const [i, id] of data.orderedIds.entries()) {
           await tx

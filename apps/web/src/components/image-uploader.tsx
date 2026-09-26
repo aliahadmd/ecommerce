@@ -5,6 +5,7 @@ import {
   deleteProductImage,
   setPrimaryImage,
 } from "@/server/uploads"
+import { reorderProductImages } from "@/server/catalog"
 import { Progress } from "@/components/ui/progress"
 
 interface ImageRow {
@@ -64,6 +65,18 @@ export function ImageUploader({
     },
   })
 
+  const reorder = useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      reorderProductImages({ data: { productId, imageIds: orderedIds } }),
+    onSuccess: (result) => {
+      if (!result.ok) toast.error(result.error.message)
+      void queryClient.invalidateQueries({
+        queryKey: ["product-edit", productId],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["product", productId] })
+    },
+  })
+
   const makePrimary = useMutation({
     mutationFn: (imageId: string) =>
       setPrimaryImage({ data: { productId, imageId } }),
@@ -75,6 +88,15 @@ export function ImageUploader({
       void queryClient.invalidateQueries({ queryKey: ["product", productId] })
     },
   })
+
+  function move(imageId: string, dir: -1 | 1) {
+    const ids = images.map((i) => i.id)
+    const i = ids.indexOf(imageId)
+    const j = i + dir
+    if (i === -1 || j < 0 || j >= ids.length) return
+    ;[ids[i], ids[j]] = [ids[j], ids[i]]
+    reorder.mutate(ids)
+  }
 
   return (
     <div>
@@ -94,7 +116,16 @@ export function ImageUploader({
                 primary
               </span>
             )}
-            <div className="absolute inset-x-0 bottom-0 hidden justify-between gap-1 bg-black/50 p-1 group-hover:flex">
+            <div className="absolute inset-x-0 bottom-0 hidden items-center justify-between gap-1 bg-black/50 p-1 group-hover:flex">
+              <button
+                type="button"
+                aria-label="Move image left"
+                className="text-[10px] text-white disabled:opacity-40"
+                disabled={i === 0}
+                onClick={() => move(img.id, -1)}
+              >
+                ←
+              </button>
               {i !== 0 && (
                 <button
                   type="button"
@@ -110,6 +141,15 @@ export function ImageUploader({
                 onClick={() => remove.mutate(img.id)}
               >
                 delete
+              </button>
+              <button
+                type="button"
+                aria-label="Move image right"
+                className="text-[10px] text-white disabled:opacity-40"
+                disabled={i === images.length - 1}
+                onClick={() => move(img.id, 1)}
+              >
+                →
               </button>
             </div>
           </div>
@@ -136,7 +176,7 @@ export function ImageUploader({
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">
         JPEG/PNG/WebP, up to 5MB, max 8 images. First image is the product
-        photo.
+        photo — use ← / → to reorder.
       </p>
     </div>
   )

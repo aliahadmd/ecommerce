@@ -18,7 +18,6 @@ import { getCart } from "@/lib/cart-rpc"
 import { roleLabels } from "@/lib/role"
 import { setCartCount, useCartCount } from "@/lib/cart-store"
 import { initTheme, toggleTheme, useTheme } from "@/lib/theme"
-import { getSession } from "@/server/session"
 import type { AppUser } from "@/server/session"
 import { ShoppingBag, Search, LogOut, Moon, Shield, Store, Sun, User } from "lucide-react"
 
@@ -177,6 +176,3 @@ function ThemeToggle() {
   )
 }
 
-// Re-exported so route components can refetch the session without importing
-// the server module graph directly.
-export { getSession }

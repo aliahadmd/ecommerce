@@ -99,7 +99,6 @@ const cartTarget = createServerFn({ method: "POST" }).validator(
 
 export const addToCart = cartTarget.handler(({ data }) =>
   guard(async () => {
-    console.log('[addToCart] handler data:', JSON.stringify(data))
     const user = await requireUser()
     const [product] = await db
       .select({
@@ -477,6 +476,9 @@ export const placeOrder = createServerFn({ method: "POST" })
             variantId: item.variantId,
             shopId: item.shopId,
             title: item.title,
+            variantTitle: item.variantId
+              ? item.title.slice(item.title.indexOf(" — ") + 3) || null
+              : null,
             slug: item.slug,
             imageUrl: item.imageUrl,
             unitPriceCents: item.priceCents,

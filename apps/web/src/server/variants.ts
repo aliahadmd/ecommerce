@@ -141,12 +141,6 @@ export const generateVariants = createServerFn({ method: "POST" })
         .select({ id: schema.productVariants.id })
         .from(schema.productVariants)
         .where(eq(schema.productVariants.productId, data.productId))
-      if (existing.length === 0) {
-        throw new AppError(
-          "INVALID",
-          "This product has a default variant — set its option values or delete it first",
-        )
-      }
 
       // existing combinations → skip duplicates
       const existingValues = await db
@@ -190,11 +184,6 @@ export const generateVariants = createServerFn({ method: "POST" })
         .limit(1)
 
       const created = await db.transaction(async (tx) => {
-        const [first] = await db
-          .select({ id: schema.productVariants.id })
-          .from(schema.productVariants)
-          .where(eq(schema.productVariants.productId, data.productId))
-          .limit(1)
         const basePos = existing.length
         const inserted: { id: string; title: string }[] = []
         for (const [i, combo] of toInsert.entries()) {
@@ -203,12 +192,13 @@ export const generateVariants = createServerFn({ method: "POST" })
             .insert(schema.productVariants)
             .values({
               productId: data.productId,
-              sku: `${product ? "V" : "V"}-${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase(),
+              sku: `V-${Date.now().toString(36).slice(-4)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase(),
               title,
               priceCents: prodMeta?.priceCents ?? 0,
               stock: 0,
               weightGrams: prodMeta?.weightGrams ?? null,
-              isDefault: existing.length === 0 && i === 0 && first === undefined,
+              // the first generated variant becomes default when starting empty
+              isDefault: existing.length === 0 && i === 0,
               status: "draft",
               position: basePos + i,
             })

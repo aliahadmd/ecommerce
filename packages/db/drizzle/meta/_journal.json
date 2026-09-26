@@ -85,6 +85,13 @@
       "when": 1790357558682,
       "tag": "0011_rainy_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790440692822,
+      "tag": "0012_cart_variant_unique_coalesced",
+      "breakpoints": true
     }
   ]
 }
