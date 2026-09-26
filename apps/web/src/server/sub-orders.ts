@@ -231,6 +231,11 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
           .set({ status: data.status })
           .where(eq(schema.subOrders.id, data.subOrderId))
         await recomputeOrderStatus(tx, row.sub.orderId)
+        // seller earnings ledger entry on delivery (plan-5)
+        if (data.status === "delivered") {
+          const { ledgerSaleForSubOrder } = await import("./payouts-internals")
+          await ledgerSaleForSubOrder(tx, data.subOrderId)
+        }
       })
       return { status: data.status }
     }),

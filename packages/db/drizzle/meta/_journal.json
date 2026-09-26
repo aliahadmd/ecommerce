@@ -127,6 +127,13 @@
       "when": 1790450618828,
       "tag": "0017_exotic_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790451978184,
+      "tag": "0018_gray_kang",
+      "breakpoints": true
     }
   ]
 }

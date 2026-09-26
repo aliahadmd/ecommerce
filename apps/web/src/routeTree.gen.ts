@@ -26,6 +26,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCatalogRouteImport } from './routes/admin.catalog'
 import { Route as AdminCouponsRouteImport } from './routes/admin/coupons'
 import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
+import { Route as AdminPayoutsRouteImport } from './routes/admin/payouts'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminTypesRouteImport } from './routes/admin/types'
@@ -35,6 +36,7 @@ import { Route as ProductsSlugRouteImport } from './routes/products/$slug'
 import { Route as SellerIndexRouteImport } from './routes/seller.index'
 import { Route as SellerOnboardingRouteImport } from './routes/seller.onboarding'
 import { Route as SellerOrdersRouteImport } from './routes/seller/orders'
+import { Route as SellerPayoutsRouteImport } from './routes/seller/payouts'
 import { Route as SellerReviewsRouteImport } from './routes/seller/reviews'
 import { Route as ShopsSlugRouteImport } from './routes/shops.$slug'
 import { Route as AccountOrdersIndexRouteImport } from './routes/account/orders/index'
@@ -131,6 +133,11 @@ const AdminOrdersRoute = AdminOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPayoutsRoute = AdminPayoutsRouteImport.update({
+  id: '/payouts',
+  path: '/payouts',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -174,6 +181,11 @@ const SellerOnboardingRoute = SellerOnboardingRouteImport.update({
 const SellerOrdersRoute = SellerOrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
+  getParentRoute: () => SellerRoute,
+} as any)
+const SellerPayoutsRoute = SellerPayoutsRouteImport.update({
+  id: '/payouts',
+  path: '/payouts',
   getParentRoute: () => SellerRoute,
 } as any)
 const SellerReviewsRoute = SellerReviewsRouteImport.update({
@@ -243,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payouts': typeof AdminPayoutsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/types': typeof AdminTypesRoute
@@ -250,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
+  '/seller/payouts': typeof SellerPayoutsRoute
   '/seller/reviews': typeof SellerReviewsRoute
   '/shops/$slug': typeof ShopsSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -279,6 +293,7 @@ export interface FileRoutesByTo {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payouts': typeof AdminPayoutsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/types': typeof AdminTypesRoute
@@ -286,6 +301,7 @@ export interface FileRoutesByTo {
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
+  '/seller/payouts': typeof SellerPayoutsRoute
   '/seller/reviews': typeof SellerReviewsRoute
   '/shops/$slug': typeof ShopsSlugRoute
   '/account': typeof AccountIndexRoute
@@ -318,6 +334,7 @@ export interface FileRoutesById {
   '/admin/catalog': typeof AdminCatalogRoute
   '/admin/coupons': typeof AdminCouponsRoute
   '/admin/orders': typeof AdminOrdersRoute
+  '/admin/payouts': typeof AdminPayoutsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/types': typeof AdminTypesRoute
@@ -325,6 +342,7 @@ export interface FileRoutesById {
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
   '/seller/orders': typeof SellerOrdersRoute
+  '/seller/payouts': typeof SellerPayoutsRoute
   '/seller/reviews': typeof SellerReviewsRoute
   '/shops/$slug': typeof ShopsSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -358,6 +376,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/coupons'
     | '/admin/orders'
+    | '/admin/payouts'
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/types'
@@ -365,6 +384,7 @@ export interface FileRouteTypes {
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
+    | '/seller/payouts'
     | '/seller/reviews'
     | '/shops/$slug'
     | '/account/'
@@ -394,6 +414,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/coupons'
     | '/admin/orders'
+    | '/admin/payouts'
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/types'
@@ -401,6 +422,7 @@ export interface FileRouteTypes {
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
+    | '/seller/payouts'
     | '/seller/reviews'
     | '/shops/$slug'
     | '/account'
@@ -432,6 +454,7 @@ export interface FileRouteTypes {
     | '/admin/catalog'
     | '/admin/coupons'
     | '/admin/orders'
+    | '/admin/payouts'
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/types'
@@ -439,6 +462,7 @@ export interface FileRouteTypes {
     | '/products/$slug'
     | '/seller/onboarding'
     | '/seller/orders'
+    | '/seller/payouts'
     | '/seller/reviews'
     | '/shops/$slug'
     | '/account/'
@@ -600,6 +624,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/payouts': {
+      id: '/admin/payouts'
+      path: '/payouts'
+      fullPath: '/admin/payouts'
+      preLoaderRoute: typeof AdminPayoutsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/products': {
       id: '/admin/products'
       path: '/products'
@@ -661,6 +692,13 @@ declare module '@tanstack/react-router' {
       path: '/orders'
       fullPath: '/seller/orders'
       preLoaderRoute: typeof SellerOrdersRouteImport
+      parentRoute: typeof SellerRoute
+    }
+    '/seller/payouts': {
+      id: '/seller/payouts'
+      path: '/payouts'
+      fullPath: '/seller/payouts'
+      preLoaderRoute: typeof SellerPayoutsRouteImport
       parentRoute: typeof SellerRoute
     }
     '/seller/reviews': {
@@ -740,6 +778,7 @@ interface AdminRouteChildren {
   AdminCatalogRoute: typeof AdminCatalogRoute
   AdminCouponsRoute: typeof AdminCouponsRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminPayoutsRoute: typeof AdminPayoutsRoute
   AdminProductsRoute: typeof AdminProductsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminTypesRoute: typeof AdminTypesRoute
@@ -750,6 +789,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCatalogRoute: AdminCatalogRoute,
   AdminCouponsRoute: AdminCouponsRoute,
   AdminOrdersRoute: AdminOrdersRoute,
+  AdminPayoutsRoute: AdminPayoutsRoute,
   AdminProductsRoute: AdminProductsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminTypesRoute: AdminTypesRoute,
@@ -773,6 +813,7 @@ const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
 interface SellerRouteChildren {
   SellerOnboardingRoute: typeof SellerOnboardingRoute
   SellerOrdersRoute: typeof SellerOrdersRoute
+  SellerPayoutsRoute: typeof SellerPayoutsRoute
   SellerReviewsRoute: typeof SellerReviewsRoute
   SellerIndexRoute: typeof SellerIndexRoute
   SellerProductsNewRoute: typeof SellerProductsNewRoute
@@ -783,6 +824,7 @@ interface SellerRouteChildren {
 const SellerRouteChildren: SellerRouteChildren = {
   SellerOnboardingRoute: SellerOnboardingRoute,
   SellerOrdersRoute: SellerOrdersRoute,
+  SellerPayoutsRoute: SellerPayoutsRoute,
   SellerReviewsRoute: SellerReviewsRoute,
   SellerIndexRoute: SellerIndexRoute,
   SellerProductsNewRoute: SellerProductsNewRoute,
