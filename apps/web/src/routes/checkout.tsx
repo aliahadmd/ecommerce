@@ -47,6 +47,7 @@ function CheckoutPage() {
   const [selected, setSelected] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [placing, setPlacing] = useState(false)
+  const [method, setMethod] = useState<"cod" | "card">("cod")
 
   const { data: cart } = useQuery({
     queryKey: ["cart"],
@@ -247,13 +248,28 @@ function CheckoutPage() {
                 <span>{formatMoney(cart.subtotalCents, currency)}</span>
               </div>
             </div>
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={place}
-              disabled={placing || !chosen}
-            >
-              {placing ? "Placing…" : "Place order (pay on delivery)"}
+            <div className="flex gap-2">
+              <Button
+                variant={method === "cod" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setMethod("cod")}
+              >
+                Cash on delivery
+              </Button>
+              <Button
+                variant={method === "card" ? "default" : "outline"}
+                className="flex-1"
+                onClick={() => setMethod("card")}
+              >
+                Card
+              </Button>
+            </div>
+            <Button className="w-full" size="lg" onClick={place} disabled={placing || !chosen}>
+              {placing
+                ? "Placing…"
+                : method === "card"
+                  ? "Place order & pay by card"
+                  : "Place order (pay on delivery)"}
             </Button>
           </CardContent>
         </Card>

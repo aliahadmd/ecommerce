@@ -1,0 +1,2 @@
+ALTER TYPE "public"."payment_method" ADD VALUE 'card';--> statement-breakpoint
+ALTER TABLE "payments" ALTER COLUMN "method" SET DATA TYPE "public"."payment_method" USING "method"::"public"."payment_method";

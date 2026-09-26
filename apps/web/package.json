@@ -17,6 +17,7 @@
     "@aws-sdk/client-s3": "^3.1139.0",
     "@base-ui/react": "^1.8.0",
     "@ecommerce/ai": "workspace:*",
+    "@ecommerce/payments": "workspace:*",
     "@ecommerce/auth": "workspace:*",
     "@ecommerce/config": "workspace:*",
     "@ecommerce/db": "workspace:*",

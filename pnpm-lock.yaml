@@ -161,6 +161,9 @@ importers:
       '@ecommerce/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@ecommerce/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       '@ecommerce/redis':
         specifier: workspace:*
         version: link:../../packages/redis
@@ -392,6 +395,19 @@ importers:
       '@types/nodemailer':
         specifier: ^7.0.1
         version: 7.0.12
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/payments:
+    dependencies:
+      '@ecommerce/config':
+        specifier: workspace:*
+        version: link:../config
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

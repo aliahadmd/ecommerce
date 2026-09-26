@@ -26,7 +26,7 @@ export const orderStatus = pgEnum("order_status", [
   "cancelled",
 ]);
 
-export const paymentMethod = pgEnum("payment_method", ["cod"]);
+export const paymentMethod = pgEnum("payment_method", ["cod", "card"]);
 
 export const paymentStatus = pgEnum("payment_status", ["unpaid", "paid", "void"]);
 

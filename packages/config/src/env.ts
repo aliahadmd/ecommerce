@@ -47,6 +47,10 @@ const envSchema = z.object({
   AI_MODEL: z.string().default("z-ai/glm-4.6"),
   AI_DAILY_LIMIT: z.coerce.number().default(500),
 
+  // Payments
+  PAYMENT_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
+  STRIPE_SECRET_KEY: z.string().default(""),
+
   // Commerce
   CURRENCY: z.string().length(3).default("USD"),
   SHIPPING_FEE_CENTS: z.coerce.number().default(0),
