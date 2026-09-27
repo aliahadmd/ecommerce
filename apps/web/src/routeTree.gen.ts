@@ -33,6 +33,7 @@ import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminTypesRouteImport } from './routes/admin/types'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as PayRefRouteImport } from './routes/pay.$ref'
 import { Route as ProductsIndexRouteImport } from './routes/products/index'
 import { Route as ProductsSlugRouteImport } from './routes/products/$slug'
 import { Route as SellerIndexRouteImport } from './routes/seller.index'
@@ -46,7 +47,6 @@ import { Route as AccountOrdersIndexRouteImport } from './routes/account/orders/
 import { Route as AccountOrdersIdRouteImport } from './routes/account/orders/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiPaymentsCallbackRouteImport } from './routes/api/payments/callback'
-import { Route as CheckoutPayRefRouteImport } from './routes/checkout/pay.$ref'
 import { Route as SellerProductsIndexRouteImport } from './routes/seller/products/index'
 import { Route as SellerProductsNewRouteImport } from './routes/seller/products/new'
 import { Route as SellerProductsIdEditRouteImport } from './routes/seller/products/$id.edit'
@@ -171,6 +171,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PayRefRoute = PayRefRouteImport.update({
+  id: '/pay/$ref',
+  path: '/pay/$ref',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsIndexRoute = ProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -236,11 +241,6 @@ const ApiPaymentsCallbackRoute = ApiPaymentsCallbackRouteImport.update({
   path: '/api/payments/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CheckoutPayRefRoute = CheckoutPayRefRouteImport.update({
-  id: '/pay/$ref',
-  path: '/pay/$ref',
-  getParentRoute: () => CheckoutRoute,
-} as any)
 const SellerProductsIndexRoute = SellerProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -261,7 +261,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRouteWithChildren
+  '/checkout': typeof CheckoutRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -280,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
+  '/pay/$ref': typeof PayRefRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -294,7 +295,6 @@ export interface FileRoutesByFullPath {
   '/account/orders/$id': typeof AccountOrdersIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
-  '/checkout/pay/$ref': typeof CheckoutPayRefRoute
   '/seller/products/new': typeof SellerProductsNewRoute
   '/account/orders/': typeof AccountOrdersIndexRoute
   '/seller/products/': typeof SellerProductsIndexRoute
@@ -303,7 +303,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRouteWithChildren
+  '/checkout': typeof CheckoutRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -321,6 +321,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
+  '/pay/$ref': typeof PayRefRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -335,7 +336,6 @@ export interface FileRoutesByTo {
   '/account/orders/$id': typeof AccountOrdersIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
-  '/checkout/pay/$ref': typeof CheckoutPayRefRoute
   '/seller/products/new': typeof SellerProductsNewRoute
   '/account/orders': typeof AccountOrdersIndexRoute
   '/seller/products': typeof SellerProductsIndexRoute
@@ -346,7 +346,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/cart': typeof CartRoute
-  '/checkout': typeof CheckoutRouteWithChildren
+  '/checkout': typeof CheckoutRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
@@ -365,6 +365,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/types': typeof AdminTypesRoute
   '/api/health': typeof ApiHealthRoute
+  '/pay/$ref': typeof PayRefRoute
   '/products/$slug': typeof ProductsSlugRoute
   '/seller/import': typeof SellerImportRoute
   '/seller/onboarding': typeof SellerOnboardingRoute
@@ -379,7 +380,6 @@ export interface FileRoutesById {
   '/account/orders/$id': typeof AccountOrdersIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/payments/callback': typeof ApiPaymentsCallbackRoute
-  '/checkout/pay/$ref': typeof CheckoutPayRefRoute
   '/seller/products/new': typeof SellerProductsNewRoute
   '/account/orders/': typeof AccountOrdersIndexRoute
   '/seller/products/': typeof SellerProductsIndexRoute
@@ -410,6 +410,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/types'
     | '/api/health'
+    | '/pay/$ref'
     | '/products/$slug'
     | '/seller/import'
     | '/seller/onboarding'
@@ -424,7 +425,6 @@ export interface FileRouteTypes {
     | '/account/orders/$id'
     | '/api/auth/$'
     | '/api/payments/callback'
-    | '/checkout/pay/$ref'
     | '/seller/products/new'
     | '/account/orders/'
     | '/seller/products/'
@@ -451,6 +451,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/types'
     | '/api/health'
+    | '/pay/$ref'
     | '/products/$slug'
     | '/seller/import'
     | '/seller/onboarding'
@@ -465,7 +466,6 @@ export interface FileRouteTypes {
     | '/account/orders/$id'
     | '/api/auth/$'
     | '/api/payments/callback'
-    | '/checkout/pay/$ref'
     | '/seller/products/new'
     | '/account/orders'
     | '/seller/products'
@@ -494,6 +494,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/types'
     | '/api/health'
+    | '/pay/$ref'
     | '/products/$slug'
     | '/seller/import'
     | '/seller/onboarding'
@@ -508,7 +509,6 @@ export interface FileRouteTypes {
     | '/account/orders/$id'
     | '/api/auth/$'
     | '/api/payments/callback'
-    | '/checkout/pay/$ref'
     | '/seller/products/new'
     | '/account/orders/'
     | '/seller/products/'
@@ -519,7 +519,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   CartRoute: typeof CartRoute
-  CheckoutRoute: typeof CheckoutRouteWithChildren
+  CheckoutRoute: typeof CheckoutRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -530,6 +530,7 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountWishlistRoute: typeof AccountWishlistRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  PayRefRoute: typeof PayRefRoute
   ProductsSlugRoute: typeof ProductsSlugRoute
   ShopsSlugRoute: typeof ShopsSlugRoute
   AccountIndexRoute: typeof AccountIndexRoute
@@ -710,6 +711,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pay/$ref': {
+      id: '/pay/$ref'
+      path: '/pay/$ref'
+      fullPath: '/pay/$ref'
+      preLoaderRoute: typeof PayRefRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products/': {
       id: '/products/'
       path: '/products'
@@ -801,13 +809,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/checkout/pay/$ref': {
-      id: '/checkout/pay/$ref'
-      path: '/pay/$ref'
-      fullPath: '/checkout/pay/$ref'
-      preLoaderRoute: typeof CheckoutPayRefRouteImport
-      parentRoute: typeof CheckoutRoute
-    }
     '/seller/products/': {
       id: '/seller/products/'
       path: '/products'
@@ -858,18 +859,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface CheckoutRouteChildren {
-  CheckoutPayRefRoute: typeof CheckoutPayRefRoute
-}
-
-const CheckoutRouteChildren: CheckoutRouteChildren = {
-  CheckoutPayRefRoute: CheckoutPayRefRoute,
-}
-
-const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
-  CheckoutRouteChildren,
-)
-
 interface SellerRouteChildren {
   SellerImportRoute: typeof SellerImportRoute
   SellerOnboardingRoute: typeof SellerOnboardingRoute
@@ -901,7 +890,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   CartRoute: CartRoute,
-  CheckoutRoute: CheckoutRouteWithChildren,
+  CheckoutRoute: CheckoutRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
@@ -912,6 +901,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountWishlistRoute: AccountWishlistRoute,
   ApiHealthRoute: ApiHealthRoute,
+  PayRefRoute: PayRefRoute,
   ProductsSlugRoute: ProductsSlugRoute,
   ShopsSlugRoute: ShopsSlugRoute,
   AccountIndexRoute: AccountIndexRoute,

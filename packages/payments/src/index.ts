@@ -33,7 +33,7 @@ export const fakeProvider: PaymentProvider = {
   id: "fake",
   async createIntent({ ref }) {
     void getEnv
-    return { ref, payUrl: `/checkout/pay/${ref}` }
+    return { ref, payUrl: `/pay/${ref}` }
   },
   verifyCallback(body: unknown) {
     const b = body as { ref?: string; outcome?: string; sig?: string }

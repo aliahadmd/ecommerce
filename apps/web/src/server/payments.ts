@@ -38,7 +38,7 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
           const provider = paymentsPkg.getProvider()
           return {
             method: "card" as const,
-            payUrl: provider.id === FAKE ? `/checkout/pay/${existing.providerRef}` : "",
+            payUrl: provider.id === FAKE ? `/pay/${existing.providerRef}` : "",
           }
         }
         return { method: existing.method, payUrl: "" }

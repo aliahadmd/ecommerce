@@ -14,6 +14,7 @@ import {
   listAddresses,
   placeOrder,
 } from "@/server/commerce"
+import { startCheckoutPayment } from "@/server/payments"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Button } from "@/components/ui/button"
@@ -100,14 +101,32 @@ function CheckoutPage() {
     }
     setPlacing(true)
     const result = await placeOrder({ data: { addressId: chosen } })
-    setPlacing(false)
     if (!result.ok) {
+      setPlacing(false)
       toast.error(result.error.message)
       return
     }
     setCartCount(0)
     void queryClient.invalidateQueries({ queryKey: ["cart"] })
     void queryClient.invalidateQueries({ queryKey: ["addresses"] })
+
+    // settle payment: COD stays cash-on-delivery; card redirects to gateway
+    const payment = await startCheckoutPayment({
+      data: { orderId: result.data.id, method },
+    })
+    if (!payment.ok) {
+      toast.error(payment.error.message)
+      void navigate({
+        to: "/account/orders/$id",
+        params: { id: result.data.id },
+        search: {},
+      })
+      return
+    }
+    if (payment.data.method === "card" && payment.data.payUrl) {
+      window.location.href = payment.data.payUrl
+      return
+    }
     toast.success(
       `Order ${result.data.orderNumber} placed — pay cash on delivery`
     )

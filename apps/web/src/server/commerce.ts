@@ -3,7 +3,6 @@ import { db, schema, and, asc, desc, eq, gte, inArray, sql } from "@ecommerce/db
 import { formatMoney, getEnv } from "@ecommerce/config"
 import type { OrderEmailItem } from "@ecommerce/email"
 import { recomputeProductAggregates } from "./internals"
-import { enqueueEmail } from "@ecommerce/jobs"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
 // ─── Cart ───────────────────────────────────────────────────────────────────
@@ -388,7 +387,7 @@ export const placeOrder = createServerFn({ method: "POST" })
           .where(eq(schema.carts.id, cart.id))
           .limit(1)
         if (cartRow?.couponId) {
-          const { validateCouponForCheckout } = await import("./coupons")
+          const { validateCouponForCheckout } = await import("./coupons-internals")
           const subtotal = items.reduce(
             (sum, i) => sum + i.priceCents * i.quantity,
             0
@@ -570,8 +569,8 @@ export const placeOrder = createServerFn({ method: "POST" })
         let discountLeft = discountCents
         let subOrderIdx = 0
         const subOrderIdByShop = new Map<string, string>()
-        for (const [shopId, items] of byShop) {
-          const sub = items.reduce(
+        for (const [shopId, shopItems] of byShop) {
+          const sub = shopItems.reduce(
             (sum, i) => sum + i.totalCents,
             0
           )
@@ -640,6 +639,8 @@ export const placeOrder = createServerFn({ method: "POST" })
         for (const pid of variantProductIds) {
           await recomputeProductAggregates(tx, pid)
         }
+        const { enqueueEmail } = await import("@ecommerce/jobs")
+        void enqueueEmail
         return order
       })
 
@@ -662,6 +663,7 @@ export const placeOrder = createServerFn({ method: "POST" })
       }))
       const addressText = `${result.shipLine1}${result.shipLine2 ? ", " + result.shipLine2 : ""}, ${result.shipCity} ${result.shipPostalCode ?? ""}, ${result.shipCountry}`
       const totalFormatted = formatMoney(result.totalCents, result.currency)
+      const { enqueueEmail } = await import("@ecommerce/jobs")
       void enqueueEmail({
         template: "order_placed",
         to: user.email,

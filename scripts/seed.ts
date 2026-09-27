@@ -383,6 +383,7 @@ async function main() {
   // ─── Phase 2: product types, attributes, variants, reviews, wishlist ──────
   const { and, sql } = await import("@ecommerce/db")
   const {
+    coupons,
     attributeDefinitions, productTypes, productAttributeValues, productVariants,
     variantOptionValues, reviews, wishlistItems, orders, orderItems, users,
     products: productsTable,
@@ -527,6 +528,18 @@ async function main() {
   if (buyer && kb) {
     await db.insert(wishlistItems).values({ userId: buyer.id, productId: kb.id }).onConflictDoNothing()
     console.log("  wishlist item for buyer")
+  }
+
+  // ─── E2E coupon ───
+  const [couponUser] = await db.select().from(users).where(eq(users.email, env.SUPER_ADMIN_EMAIL)).limit(1)
+  if (couponUser) {
+    await db.insert(coupons).values({
+      code: "E2E10",
+      kind: "percent",
+      value: 10,
+      createdBy: couponUser.id,
+    }).onConflictDoNothing({ target: coupons.code })
+    console.log("  coupon E2E10")
   }
 
   console.log("Seed complete.");

@@ -4,7 +4,7 @@ import * as paymentsPkg from "@ecommerce/payments"
 
 /**
  * Fake gateway settle endpoint (plan-3). Signature-verified; the page at
- * /checkout/pay/$ref posts here. Real provider webhooks follow the same path.
+ * /pay/$ref posts here. Real provider webhooks follow the same path.
  */
 export const Route = createFileRoute("/api/payments/callback")({
   server: {

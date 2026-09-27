@@ -15,7 +15,7 @@ import {
  * DEV FAKE GATEWAY (plan-3): simulates a hosted payment page. Never exposed
  * in production — PAYMENT_PROVIDER=stripe replaces this flow.
  */
-export const Route = createFileRoute("/checkout/pay/$ref")({
+export const Route = createFileRoute("/pay/$ref")({
   component: FakePayPage,
 })
 
