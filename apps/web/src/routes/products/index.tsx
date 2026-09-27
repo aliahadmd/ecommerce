@@ -297,7 +297,7 @@ function ProductsPage() {
             </p>
           )}
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="stagger-grid grid grid-cols-2 gap-4 md:grid-cols-3">
             {!items
               ? Array.from({ length: 9 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-4/3 w-full" />

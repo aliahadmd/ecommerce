@@ -72,7 +72,14 @@ export function WishlistHeart({
         toggle.mutate()
       }}
     >
-      <Heart className={cn("size-4", saved && "fill-destructive text-destructive")} />
+      {/* key remount replays the pop on each save — no pop when removing */}
+      <Heart
+        key={saved ? "saved" : "unsaved"}
+        className={cn(
+          "size-4",
+          saved && "animate-pop fill-destructive text-destructive"
+        )}
+      />
     </Button>
   )
 }

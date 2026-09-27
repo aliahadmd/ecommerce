@@ -68,7 +68,7 @@ function HomePage() {
       {recentProducts && recentProducts.length > 0 && (
         <>
           <h2 className="mb-4 text-lg font-semibold">Recently viewed</h2>
-          <div className="mb-10 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="stagger-grid mb-10 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {recentProducts.slice(0, 4).map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -77,7 +77,7 @@ function HomePage() {
       )}
 
       <h2 className="mb-4 text-lg font-semibold">New arrivals</h2>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="stagger-grid grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {!products
           ? Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-4/3 w-full" />

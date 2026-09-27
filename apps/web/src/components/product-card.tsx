@@ -39,7 +39,7 @@ export function ProductCard({
   wishlist?: CardGridWishlist
 }) {
   return (
-    <Card className="gap-0 overflow-hidden pt-0">
+    <Card className="group gap-0 overflow-hidden pt-0 transition-shadow duration-200 hover:shadow-md">
       <Link
         to="/products/$slug"
         params={{ slug: product.slug }}
@@ -50,7 +50,7 @@ export function ProductCard({
             <img
               src={product.imageUrl}
               alt={product.title}
-              className="h-full w-full object-cover transition-transform hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-300 ease-emphasized group-hover:scale-105"
               loading="lazy"
             />
           ) : (

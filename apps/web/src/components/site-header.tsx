@@ -97,7 +97,10 @@ export function Header({ user }: { user: AppUser | null }) {
           >
             <ShoppingBag className="size-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+              <span
+                key={cartCount}
+                className="animate-pop absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
+              >
                 {cartCount}
               </span>
             )}

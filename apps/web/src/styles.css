@@ -5,6 +5,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Motion tokens: strong custom curves instead of stock easings. ease-emphasized
+   for entries/press (starts fast = responsive), ease-drawer for on-screen
+   movement. Generated utilities: ease-emphasized / ease-drawer. */
+@theme {
+  --ease-emphasized: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* hover: effects only on devices that can actually hover — touch taps must
+   not trigger zoom/color states. Overrides the built-in hover variant. */
+@custom-variant hover {
+  &:hover {
+    @media (hover: hover);
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "Inter Variable", sans-serif;
@@ -130,5 +146,78 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Reduced motion = gentler, not absent: end states still apply instantly,
+     but nothing travels across the screen. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Staggered entry for product grids: pure CSS, delays capped so long grids
+   never feel slow, `backwards` fill holds the hidden state during the delay. */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-grid > * {
+    animation: stagger-rise 320ms var(--ease-emphasized) backwards;
+  }
+  .stagger-grid > *:nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .stagger-grid > *:nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .stagger-grid > *:nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .stagger-grid > *:nth-child(5) {
+    animation-delay: 160ms;
+  }
+  .stagger-grid > *:nth-child(6) {
+    animation-delay: 200ms;
+  }
+  .stagger-grid > *:nth-child(7) {
+    animation-delay: 240ms;
+  }
+  .stagger-grid > *:nth-child(8) {
+    animation-delay: 280ms;
+  }
+  .stagger-grid > *:nth-child(n + 9) {
+    animation-delay: 320ms;
+  }
+}
+@keyframes stagger-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Feedback pop for small icons (wishlist heart save, cart badge bump).
+   Runs on mount via key remount; never from scale(0). */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-pop {
+    animation: pop 250ms var(--ease-emphasized);
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
   }
 }

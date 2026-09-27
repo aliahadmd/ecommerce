@@ -156,7 +156,7 @@ function ProductDetailPage() {
               <img
                 src={images[0].url}
                 alt={images[0].alt ?? product.title}
-                className="h-full w-full object-cover"
+                className="animate-in fade-in duration-300 h-full w-full object-cover"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-6xl">
