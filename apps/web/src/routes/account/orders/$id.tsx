@@ -27,7 +27,7 @@ function OrderDetailPage() {
 
   if (!data)
     return <main className="mx-auto max-w-3xl px-4 py-8">Loading…</main>
-  const { order, items } = data
+  const { order, items, subOrders } = data
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -58,32 +58,57 @@ function OrderDetailPage() {
               delivery.
             </p>
           )}
-          <div className="grid gap-1">
-            {items.map((i) => (
-              <div key={i.id} className="flex items-center gap-3 py-1">
-                <div className="size-10 overflow-hidden rounded-md bg-muted">
-                  {i.imageUrl && (
-                    <img
-                      src={i.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                </div>
-                <Link
-                  to="/products/$slug"
-                  params={{ slug: i.slug }}
-                  className="flex-1 hover:underline"
-                >
-                  {i.title}
-                </Link>
-                <span className="text-muted-foreground">× {i.quantity}</span>
-                <span className="w-20 text-right">
-                  {formatMoney(i.totalCents, order.currency)}
-                </span>
+          {subOrders.map((sub) => (
+            <div key={sub.id} className="rounded-lg border p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-sm font-medium">{sub.shopName}</span>
+                <Badge variant={sub.status === "cancelled" ? "destructive" : "secondary"}>
+                  {sub.status}
+                </Badge>
+                {sub.cancelReason && (
+                  <span className="text-xs text-muted-foreground">({sub.cancelReason})</span>
+                )}
               </div>
-            ))}
-          </div>
+              <div className="grid gap-1">
+                {items
+                  .filter((i) => i.subOrderId === sub.id)
+                  .map((i) => (
+                    <div key={i.id} className="flex items-center gap-3 py-1">
+                      <div className="size-10 overflow-hidden rounded-md bg-muted">
+                        {i.imageUrl && (
+                          <img
+                            src={i.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <Link
+                        to="/products/$slug"
+                        params={{ slug: i.slug }}
+                        className="flex-1 hover:underline"
+                      >
+                        {i.title}
+                      </Link>
+                      <span className="text-muted-foreground">× {i.quantity}</span>
+                      <span className="w-20 text-right">
+                        {formatMoney(i.totalCents, order.currency)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+              <p className="text-muted-foreground mt-2 text-right text-xs">
+                Subtotal {formatMoney(sub.subtotalCents, order.currency)}
+                {sub.discountCents > 0
+                  ? ` − discount ${formatMoney(sub.discountCents, order.currency)}`
+                  : ""}
+                {sub.shippingCents > 0
+                  ? ` + shipping ${formatMoney(sub.shippingCents, order.currency)}`
+                  : ""}{" "}
+                = {formatMoney(sub.totalCents, order.currency)}
+              </p>
+            </div>
+          ))}
           <Separator />
           <div className="flex justify-between">
             <span className="text-muted-foreground">Total</span>

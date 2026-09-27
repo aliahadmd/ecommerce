@@ -181,7 +181,7 @@ export async function validateCouponForCheckout(
   userId: string,
   subtotalCents: number,
   cartShopIds: string[]
-): Promise<number> {
+): Promise<{ discountCents: number; freeShipping: boolean }> {
   const [coupon] = await db
     .select()
     .from(schema.coupons)
@@ -215,7 +215,10 @@ export async function validateCouponForCheckout(
   if (mine >= coupon.maxUsesPerUser) {
     throw new AppError("INVALID", "You already used this coupon")
   }
-  return computeDiscountCents(coupon.kind, coupon.value, subtotalCents)
+  return {
+    discountCents: computeDiscountCents(coupon.kind, coupon.value, subtotalCents),
+    freeShipping: coupon.kind === "free_shipping",
+  }
 }
 
 // ── settlement (called inside the placeOrder transaction via import) ────────

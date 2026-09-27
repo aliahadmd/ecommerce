@@ -174,27 +174,48 @@ export const commitImport = createServerFn({ method: "POST" })
       const { staged }: { staged: { row: ParsedRow; ok: boolean }[] } = JSON.parse(raw)
 
       let created = 0
+      // variant rows attach to the most recent product row (export shape)
+      let lastProductId: string | null = null
       for (const { row } of staged) {
-        if (row.kind !== "product") continue
-        let slug = row.slug
-        const [taken] = await db
-          .select({ id: schema.products.id })
-          .from(schema.products)
-          .where(eq(schema.products.slug, slug))
-          .limit(1)
-        if (taken) slug = slugWithSuffix(slug)
-        await db.insert(schema.products).values({
-          shopId: shop.id,
-          title: row.title,
-          slug,
-          description: `Imported product ${row.title}.`,
-          brand: row.brand,
-          condition: row.condition as "new" | "used" | "refurbished",
-          priceCents: row.priceCents,
-          stock: row.stock,
-          status: "draft",
-        })
-        created++
+        if (row.kind === "product") {
+          let slug = row.slug
+          const [taken] = await db
+            .select({ id: schema.products.id })
+            .from(schema.products)
+            .where(eq(schema.products.slug, slug))
+            .limit(1)
+          if (taken) slug = slugWithSuffix(slug)
+          const [product] = await db
+            .insert(schema.products)
+            .values({
+              shopId: shop.id,
+              title: row.title,
+              slug,
+              description: `Imported product ${row.title}.`,
+              brand: row.brand,
+              condition: row.condition as "new" | "used" | "refurbished",
+              priceCents: row.priceCents,
+              stock: row.stock,
+              status: "draft",
+            })
+            .returning({ id: schema.products.id })
+          lastProductId = product.id
+          created++
+        } else {
+          // variant row: attach to the preceding product
+          if (!lastProductId) {
+            continue
+          }
+          const sku = row.variantSku || `IMP-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase()
+          await db.insert(schema.productVariants).values({
+            productId: lastProductId,
+            sku,
+            title: row.variantTitle || row.title,
+            priceCents: row.priceCents,
+            stock: row.stock,
+            status: "draft",
+          }).onConflictDoNothing()
+        }
       }
       // clear the staged data
       await getRedis().del(`import:${user.id}:${data.importId}`)

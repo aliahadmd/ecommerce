@@ -1,11 +1,11 @@
-import { db, schema, and, eq } from "@ecommerce/db"
+import { db, schema, and, eq, sql } from "@ecommerce/db"
 
 /**
  * SERVER-ONLY ledger helpers (plan-5). Never import from client code —
  * these reference the drizzle client directly.
  */
 
-async function getCommissionPercent(): Promise<number> {
+export async function getCommissionPercent(): Promise<number> {
   const [row] = await db
     .select()
     .from(schema.settings)
@@ -78,4 +78,26 @@ export async function ledgerRefundForSubOrder(
     netCents: -(refundCents - commission),
     memo: "refund",
   })
+}
+
+/**
+ * Derive orders.payment_status from the payments table (plan-3/M11):
+ * any succeeded payment → paid; all failed/void → unpaid.
+ */
+export async function deriveOrderPaymentStatus(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  orderId: string
+): Promise<void> {
+  const [row] = await tx
+    .select({
+      paid: sql<number>`count(*) FILTER (WHERE state = 'succeeded')::int`,
+      pending: sql<number>`count(*) FILTER (WHERE state IN ('requires_payment', 'processing', 'pending_on_delivery'))::int`,
+    })
+    .from(schema.payments)
+    .where(eq(schema.payments.orderId, orderId))
+  const state = (row?.paid ?? 0) > 0 ? "paid" : (row?.pending ?? 0) > 0 ? "unpaid" : "void"
+  await tx
+    .update(schema.orders)
+    .set({ paymentStatus: state })
+    .where(eq(schema.orders.id, orderId))
 }

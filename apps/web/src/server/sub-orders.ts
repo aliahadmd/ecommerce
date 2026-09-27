@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
-import { db, schema, desc, eq, inArray, sql } from "@ecommerce/db"
+import { db, schema, and, desc, eq, inArray, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { recomputeOrderStatus } from "./internals"
 import { enqueueEmail, enqueueNotification } from "@ecommerce/jobs"
@@ -208,6 +208,25 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
             void notifyBackInStock(pid)
           }
           await recomputeOrderStatus(tx, row.sub.orderId)
+          // if every sub-order is now cancelled, void the payment (plan-3)
+          const [{ remaining }] = await tx
+            .select({ remaining: sql<number>`count(*) FILTER (WHERE status <> 'cancelled')::int` })
+            .from(schema.subOrders)
+            .where(eq(schema.subOrders.orderId, row.sub.orderId))
+          if ((remaining ?? 0) === 0) {
+            await tx
+              .update(schema.payments)
+              .set({ state: "failed" })
+              .where(
+                and(
+                  eq(schema.payments.orderId, row.sub.orderId),
+                  eq(schema.payments.method, "cod"),
+                  eq(schema.payments.state, "pending_on_delivery")
+                )
+              )
+            const { deriveOrderPaymentStatus } = await import("./payouts-internals")
+            await deriveOrderPaymentStatus(tx, row.sub.orderId)
+          }
         })
         return { status: "cancelled" as const }
       }

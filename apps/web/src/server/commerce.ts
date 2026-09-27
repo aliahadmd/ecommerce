@@ -1,12 +1,10 @@
 import { createServerFn } from "@tanstack/react-start"
-import { db, schema, and, desc, eq, gte, inArray, sql } from "@ecommerce/db"
+import { db, schema, and, asc, desc, eq, gte, inArray, sql } from "@ecommerce/db"
 import { formatMoney, getEnv } from "@ecommerce/config"
 import type { OrderEmailItem } from "@ecommerce/email"
 import { recomputeProductAggregates } from "./internals"
 import { enqueueEmail } from "@ecommerce/jobs"
 import { AppError, guard, requireRole, requireUser } from "./session"
-import { canCancel, canMarkPaid, canTransition } from "@/lib/order-machine"
-import type { OrderStatus } from "@/lib/order-machine"
 
 // ─── Cart ───────────────────────────────────────────────────────────────────
 
@@ -382,6 +380,7 @@ export const placeOrder = createServerFn({ method: "POST" })
       // compute the discount. Final validation + redemption happen in-tx.
       let couponId: string | null = null
       let discountCents = 0
+      let freeShipping = false
       {
         const [cartRow] = await db
           .select({ couponId: schema.carts.couponId })
@@ -395,12 +394,14 @@ export const placeOrder = createServerFn({ method: "POST" })
             0
           )
           const shopIds = [...new Set(items.map((i) => i.shopId))]
-          discountCents = await validateCouponForCheckout(
+          const validated = await validateCouponForCheckout(
             cartRow.couponId,
             user.id,
             subtotal,
             shopIds
           )
+          discountCents = validated.discountCents
+          freeShipping = validated.freeShipping
           couponId = cartRow.couponId
         }
       }
@@ -509,6 +510,8 @@ export const placeOrder = createServerFn({ method: "POST" })
           })
         }
 
+        const shippingTotal = freeShipping ? 0 : shippingFeeCents
+
         // Retry on the (rare) order-number collision
         let order!: typeof schema.orders.$inferSelect
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -522,9 +525,12 @@ export const placeOrder = createServerFn({ method: "POST" })
                 paymentMethod: "cod",
                 paymentStatus: "unpaid",
                 subtotalCents,
-                shippingFeeCents,
+                shippingFeeCents: shippingTotal,
                 discountCents,
-                totalCents: subtotalCents + shippingFeeCents - discountCents,
+                totalCents:
+                  subtotalCents +
+                  (freeShipping ? 0 : shippingFeeCents) -
+                  discountCents,
                 currency,
                 shipName: address.fullName,
                 shipPhone: address.phone,
@@ -560,7 +566,7 @@ export const placeOrder = createServerFn({ method: "POST" })
           list.push(item)
           byShop.set(item.shopId, list)
         }
-        let shippingLeft = shippingFeeCents
+        let shippingLeft = shippingTotal
         let discountLeft = discountCents
         let subOrderIdx = 0
         const subOrderIdByShop = new Map<string, string>()
@@ -569,7 +575,7 @@ export const placeOrder = createServerFn({ method: "POST" })
             (sum, i) => sum + i.totalCents,
             0
           )
-          const shipShare = Math.min(shippingLeft, shippingFeeCents)
+          const shipShare = Math.min(shippingLeft, shippingTotal)
           shippingLeft -= shipShare
           const isLast = subOrderIdx === byShop.size - 1
           const discountShare = isLast
@@ -613,11 +619,13 @@ export const placeOrder = createServerFn({ method: "POST" })
                 eq(schema.couponRedemptions.userId, user.id)
               )
             )
+          // lock the coupon row: concurrent checkouts serialize here, so the
+          // count checks below are exact (plan-4 race fix)
           const [coupon] = await tx
             .select({ maxUsesPerUser: schema.coupons.maxUsesPerUser, maxUses: schema.coupons.maxUses })
             .from(schema.coupons)
             .where(eq(schema.coupons.id, couponId))
-            .limit(1)
+            .for("update")
           if (!coupon || mine >= coupon.maxUsesPerUser) {
             throw new AppError("INVALID", "You already used this coupon")
           }
@@ -736,10 +744,29 @@ export const getMyOrder = createServerFn({ method: "GET" })
         )
         .limit(1)
       if (!order) throw new AppError("NOT_FOUND", "Order not found")
+      // per-seller sub-order sections (plan-2)
+      const subOrders = await db
+        .select({
+          id: schema.subOrders.id,
+          shopId: schema.subOrders.shopId,
+          shopName: schema.shops.name,
+          status: schema.subOrders.status,
+          subtotalCents: schema.subOrders.subtotalCents,
+          shippingCents: schema.subOrders.shippingCents,
+          discountCents: schema.subOrders.discountCents,
+          totalCents: schema.subOrders.totalCents,
+          cancelReason: schema.subOrders.cancelReason,
+        })
+        .from(schema.subOrders)
+        .innerJoin(schema.shops, eq(schema.subOrders.shopId, schema.shops.id))
+        .where(eq(schema.subOrders.orderId, order.id))
+        .orderBy(asc(schema.subOrders.createdAt))
       const items = await db
         .select({
           id: schema.orderItems.id,
+          subOrderId: schema.orderItems.subOrderId,
           title: schema.orderItems.title,
+          variantTitle: schema.orderItems.variantTitle,
           slug: schema.orderItems.slug,
           imageUrl: schema.orderItems.imageUrl,
           unitPriceCents: schema.orderItems.unitPriceCents,
@@ -748,49 +775,11 @@ export const getMyOrder = createServerFn({ method: "GET" })
         })
         .from(schema.orderItems)
         .where(eq(schema.orderItems.orderId, order.id))
-      return { order, items }
+      return { order, items, subOrders }
     })
   )
 
 // ─── Orders: seller & admin ─────────────────────────────────────────────────
-
-async function sellerShopId(userId: string): Promise<string> {
-  const [shop] = await db
-    .select({ id: schema.shops.id })
-    .from(schema.shops)
-    .where(eq(schema.shops.ownerId, userId))
-    .limit(1)
-  if (!shop) throw new AppError("FORBIDDEN", "Create your shop first")
-  return shop.id
-}
-
-export const listShopOrders = createServerFn({ method: "GET" }).handler(() =>
-  guard(async () => {
-    const user = await requireRole("seller", "super_admin")
-    const shopId = await sellerShopId(user.id)
-    const rows = await db
-      .selectDistinctOn([schema.orders.createdAt, schema.orders.id], {
-        id: schema.orders.id,
-        orderNumber: schema.orders.orderNumber,
-        status: schema.orders.status,
-        paymentStatus: schema.orders.paymentStatus,
-        totalCents: schema.orders.totalCents,
-        currency: schema.orders.currency,
-        createdAt: schema.orders.createdAt,
-        buyerName: schema.users.name,
-      })
-      .from(schema.orders)
-      .innerJoin(
-        schema.orderItems,
-        eq(schema.orderItems.orderId, schema.orders.id)
-      )
-      .innerJoin(schema.users, eq(schema.orders.buyerId, schema.users.id))
-      .where(eq(schema.orderItems.shopId, shopId))
-      .orderBy(desc(schema.orders.createdAt), schema.orders.id)
-      .limit(100)
-    return rows
-  })
-)
 
 export const listAllOrders = createServerFn({ method: "GET" }).handler(() =>
   guard(async () => {
@@ -850,216 +839,5 @@ export const getOrderDetail = createServerFn({ method: "GET" })
       }
 
       return { order, items, shopIds, viewer: { id: user.id, role: user.role } }
-    })
-  )
-
-// ─── Order actions ──────────────────────────────────────────────────────────
-
-async function loadOrderForAction(
-  orderId: string,
-  viewer: { id: string; role: string }
-) {
-  const [order] = await db
-    .select()
-    .from(schema.orders)
-    .where(eq(schema.orders.id, orderId))
-    .limit(1)
-  if (!order) throw new AppError("NOT_FOUND", "Order not found")
-  const items = await db
-    .select({ shopId: schema.orderItems.shopId })
-    .from(schema.orderItems)
-    .where(eq(schema.orderItems.orderId, orderId))
-  const shopIds = [...new Set(items.map((i) => i.shopId))]
-
-  let viewerShopId: string | undefined
-  if (viewer.role === "seller") {
-    const [shop] = await db
-      .select({ id: schema.shops.id })
-      .from(schema.shops)
-      .where(eq(schema.shops.ownerId, viewer.id))
-      .limit(1)
-    if (!shop || !shopIds.includes(shop.id)) {
-      throw new AppError("FORBIDDEN", "This order does not contain your items")
-    }
-    viewerShopId = shop.id
-  }
-  return { order, shopIds, viewerShopId }
-}
-
-async function orderEmails(
-  orderId: string,
-  kind: "status" | "paid" | "cancelled",
-  extra?: { status?: OrderStatus; reason?: string | null }
-) {
-  const [order] = await db
-    .select()
-    .from(schema.orders)
-    .where(eq(schema.orders.id, orderId))
-    .limit(1)
-  if (!order) return
-  const [buyer] = await db
-    .select({ email: schema.users.email })
-    .from(schema.users)
-    .where(eq(schema.users.id, order.buyerId))
-    .limit(1)
-  if (!buyer) return
-  const totalFormatted = formatMoney(order.totalCents, order.currency)
-  if (kind === "status" && extra?.status) {
-    void enqueueEmail({
-      template: "order_status",
-      to: buyer.email,
-      payload: { orderNumber: order.orderNumber, status: extra.status },
-      dedupeKey: `email:order_status:${order.id}:${extra.status}`,
-    })
-  } else if (kind === "paid") {
-    void enqueueEmail({
-      template: "payment_received",
-      to: buyer.email,
-      payload: { orderNumber: order.orderNumber, totalFormatted },
-      dedupeKey: `email:payment_received:${order.id}`,
-    })
-  } else if (kind === "cancelled") {
-    void enqueueEmail({
-      template: "order_cancelled",
-      to: buyer.email,
-      payload: { orderNumber: order.orderNumber, reason: extra?.reason ?? "" },
-      dedupeKey: `email:order_cancelled:${order.id}`,
-    })
-  }
-}
-
-export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator((input: unknown) => {
-    const raw = input as {
-      orderId?: unknown
-      status?: unknown
-      reason?: unknown
-    }
-    const orderId = String(raw.orderId ?? "")
-    const status = String(raw.status ?? "") as OrderStatus
-    if (!orderId) throw new AppError("INVALID", "orderId required")
-    if (
-      !["pending", "confirmed", "shipped", "delivered", "cancelled"].includes(
-        status
-      )
-    ) {
-      throw new AppError("INVALID", "Invalid status")
-    }
-    return {
-      orderId,
-      status,
-      reason: raw.reason ? String(raw.reason).slice(0, 300) : null,
-    }
-  })
-  .handler(({ data }) =>
-    guard(async () => {
-      const user = await requireUser()
-      const { order, shopIds, viewerShopId } = await loadOrderForAction(
-        data.orderId,
-        user
-      )
-      const viewer = { id: user.id, role: user.role, shopId: viewerShopId }
-
-      if (data.status === "cancelled") {
-        if (
-          !canCancel(
-            { status: order.status, buyerId: order.buyerId, shopIds },
-            viewer
-          )
-        ) {
-          throw new AppError(
-            "FORBIDDEN",
-            "You cannot cancel this order at its current stage"
-          )
-        }
-        if (!data.reason)
-          throw new AppError("INVALID", "A cancellation reason is required")
-        await db.transaction(async (tx) => {
-          await tx
-            .update(schema.orders)
-            .set({
-              status: "cancelled",
-              paymentStatus: "void",
-              cancelReason: data.reason,
-            })
-            .where(eq(schema.orders.id, order.id))
-          const items = await tx
-            .select({
-              productId: schema.orderItems.productId,
-              variantId: schema.orderItems.variantId,
-              quantity: schema.orderItems.quantity,
-            })
-            .from(schema.orderItems)
-            .where(eq(schema.orderItems.orderId, order.id))
-          const variantProductIds = new Set<string>()
-          for (const item of items) {
-            if (item.variantId) {
-              // Variant-level restore + aggregate recompute
-              await tx
-                .update(schema.productVariants)
-                .set({ stock: sql`${schema.productVariants.stock} + ${item.quantity}` })
-                .where(eq(schema.productVariants.id, item.variantId))
-              variantProductIds.add(item.productId)
-            } else {
-              await tx
-                .update(schema.products)
-                .set({ stock: sql`${schema.products.stock} + ${item.quantity}` })
-                .where(eq(schema.products.id, item.productId))
-            }
-          }
-          for (const pid of variantProductIds) {
-            await recomputeProductAggregates(tx, pid)
-          }
-        })
-        void orderEmails(order.id, "cancelled", { reason: data.reason })
-        return { status: "cancelled" as const }
-      }
-
-      if (!canTransition(order.status, data.status)) {
-        throw new AppError(
-          "INVALID",
-          `Cannot move an order from ${order.status} to ${data.status}`
-        )
-      }
-      await db
-        .update(schema.orders)
-        .set({ status: data.status })
-        .where(eq(schema.orders.id, order.id))
-      void orderEmails(order.id, "status", { status: data.status })
-      return { status: data.status }
-    })
-  )
-
-export const markOrderPaid = createServerFn({ method: "POST" })
-  .validator((input: unknown) => {
-    const orderId = String((input as { orderId?: unknown })?.orderId ?? "")
-    if (!orderId) throw new AppError("INVALID", "orderId required")
-    return { orderId }
-  })
-  .handler(({ data }) =>
-    guard(async () => {
-      const user = await requireUser()
-      const { order, viewerShopId } = await loadOrderForAction(
-        data.orderId,
-        user
-      )
-      if (
-        !canMarkPaid(order.status, order.paymentStatus, {
-          id: user.id,
-          role: user.role,
-          shopId: viewerShopId,
-        })
-      ) {
-        throw new AppError(
-          "INVALID",
-          "Payment can be marked after delivery (cash collected by hand)"
-        )
-      }
-      await db
-        .update(schema.orders)
-        .set({ paymentStatus: "paid" })
-        .where(eq(schema.orders.id, order.id))
-      void orderEmails(order.id, "paid")
-      return { paymentStatus: "paid" as const }
     })
   )

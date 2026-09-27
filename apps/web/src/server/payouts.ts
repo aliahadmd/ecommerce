@@ -5,7 +5,10 @@ import { AppError, guard, requireRole } from "./session"
 
 const DEFAULT_COMMISSION_PERCENT = 10
 
-/** Read the commission percent from settings (cached 30s, default 10%). */
+/**
+ * Read the commission percent from settings (cached 30s, default 10%).
+ * The uncached twin used inside ledger transactions lives in payouts-internals.
+ */
 export async function getCommissionPercent(): Promise<number> {
   try {
     return await cachedJson("settings:commission", 30, async () => {

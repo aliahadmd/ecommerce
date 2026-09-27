@@ -127,9 +127,15 @@ export const reportReview = createServerFn({ method: "POST" })
     guard(async () => {
       const user = await requireUser()
       try {
-        await db
-          .insert(schema.reviewReports)
-          .values({ reviewId: data.reviewId, userId: user.id, reason: data.reason })
+        await db.transaction(async (tx) => {
+          await tx
+            .insert(schema.reviewReports)
+            .values({ reviewId: data.reviewId, userId: user.id, reason: data.reason })
+          await tx
+            .update(schema.reviews)
+            .set({ reportedAt: new Date() })
+            .where(eq(schema.reviews.id, data.reviewId))
+        })
         return { ok: true }
       } catch (err) {
         if (
@@ -152,9 +158,15 @@ export const dismissReviewReport = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       await requireRole("super_admin")
-      await db
-        .delete(schema.reviewReports)
-        .where(eq(schema.reviewReports.reviewId, data.reviewId))
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(schema.reviewReports)
+          .where(eq(schema.reviewReports.reviewId, data.reviewId))
+        await tx
+          .update(schema.reviews)
+          .set({ reportedAt: null })
+          .where(eq(schema.reviews.id, data.reviewId))
+      })
       return { ok: true }
     })
   )

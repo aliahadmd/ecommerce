@@ -1,4 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { signCallback } from "@/server/payments"
+import { toast } from "sonner"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,24 +27,21 @@ function FakePayPage() {
   async function pay(outcome: "succeeded" | "failed") {
     setBusy(outcome)
     // sign via the server (the signature secret never reaches the client)
-    const res = await fetch("/api/payments/sign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ref, outcome }),
-    })
-    const { sig } = (await res.json()) as { sig?: string }
-    if (!sig) {
+    const result = await signCallback({ data: { ref, outcome } })
+    if (!result.ok) {
+      toast.error(result.error.message)
       setBusy(null)
       return
     }
+    const sig = result.data.sig
     const cb = await fetch("/api/payments/callback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ref, outcome, sig }),
     })
-    const result = (await cb.json()) as { ok: boolean }
+    const cbResult = (await cb.json()) as { ok: boolean }
     setBusy(null)
-    if (result.ok && outcome === "succeeded") {
+    if (cbResult.ok && outcome === "succeeded") {
       void navigate({ to: "/account/orders" })
     }
   }

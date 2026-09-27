@@ -120,8 +120,10 @@ export const fakeGatewayCallback = createServerFn({ method: "POST" })
             )
           await tx
             .update(schema.orders)
-            .set({ paymentStatus: "paid", status: "confirmed" })
+            .set({ status: "confirmed" })
             .where(eq(schema.orders.id, payment.orderId))
+          const { deriveOrderPaymentStatus } = await import("./payouts-internals")
+          await deriveOrderPaymentStatus(tx, payment.orderId)
         }
       })
       return { ok: true, state: newState }
@@ -165,10 +167,14 @@ export const markCodPaid = createServerFn({ method: "POST" })
             eq(schema.payments.method, "cod")
           )
         )
-      await db
-        .update(schema.orders)
-        .set({ paymentStatus: "paid" })
-        .where(eq(schema.orders.id, data.orderId))
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.orders)
+          .set({ paymentStatus: "paid" })
+          .where(eq(schema.orders.id, data.orderId))
+        const { deriveOrderPaymentStatus } = await import("./payouts-internals")
+        await deriveOrderPaymentStatus(tx, data.orderId)
+      })
       return { ok: true }
     }),
   )
