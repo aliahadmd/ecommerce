@@ -550,7 +550,9 @@ export const placeOrder = createServerFn({ method: "POST" })
 
 
         // Per-shop sub-orders (plan-2): one per distinct shop; shipping goes
-        // to the first sub-order so cents sum exactly.
+        // to the first sub-order so cents sum exactly. Items are inserted with
+        // their subOrderId stamped directly (audit fix: the old update-before-
+        // insert left sub_order_id NULL).
         type ItemInsert = (typeof orderItems)[number]
         const byShop = new Map<string, ItemInsert[]>()
         for (const item of orderItems) {
@@ -561,6 +563,7 @@ export const placeOrder = createServerFn({ method: "POST" })
         let shippingLeft = shippingFeeCents
         let discountLeft = discountCents
         let subOrderIdx = 0
+        const subOrderIdByShop = new Map<string, string>()
         for (const [shopId, items] of byShop) {
           const sub = items.reduce(
             (sum, i) => sum + i.totalCents,
@@ -586,19 +589,15 @@ export const placeOrder = createServerFn({ method: "POST" })
               totalCents: sub + shipShare - discountShare,
             })
             .returning({ id: schema.subOrders.id })
-          await tx
-            .update(schema.orderItems)
-            .set({ subOrderId: subOrder.id })
-            .where(
-              and(
-                eq(schema.orderItems.orderId, order.id),
-                eq(schema.orderItems.shopId, shopId),
-              ),
-            )
+          subOrderIdByShop.set(shopId, subOrder.id)
         }
-        await tx
-          .insert(schema.orderItems)
-          .values(orderItems.map((i) => ({ ...i, orderId: order.id })))
+        await tx.insert(schema.orderItems).values(
+          orderItems.map((i) => ({
+            ...i,
+            orderId: order.id,
+            subOrderId: subOrderIdByShop.get(i.shopId) ?? null,
+          }))
+        )
         await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))
