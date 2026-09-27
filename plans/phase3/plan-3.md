@@ -98,3 +98,8 @@ Sub-order-scoped partial refunds (follow-up), payment provider onboarding/KYC UI
 ## As-built note (2026-09-26)
 
 COD backfill shipped in migration 0014 (payment rows for legacy orders). Stripe SDK loaded via variable dynamic import (optional peer, not a compile dep). Fake gateway callbacks HMAC-signed with BETTER_AUTH_SECRET-derived key.
+
+
+## As-built addendum (2026-09-27)
+
+Fake-gateway page moved from `/checkout/pay/$ref` to top-level `/pay/$ref`: `checkout.tsx` acts as a layout for the `checkout/` route folder and has no `<Outlet/>`, so the nested pay route never rendered (the checkout page's empty-cart branch showed instead). `fakeProvider.createIntent`, the resume-payment `payUrl` in `server/payments.ts`, and the callback doc comment updated to match. Covered by the new card-payment e2e spec (place → gateway → Pay now → order paid).

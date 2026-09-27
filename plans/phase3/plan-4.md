@@ -85,3 +85,8 @@ Auto-applied promotions, sale prices on products, buy-X-get-Y, seller-created co
 ## As-built note (2026-09-26)
 
 As planned. Discount allocated across sub-orders with remainder-to-last; coupon redemption written inside checkout tx.
+
+
+## As-built addendum (2026-09-27)
+
+Fixed a client-bundle leak found by the coupon e2e spec: `server/coupons.ts` mixed plain db-backed helpers with `createServerFn` exports, which kept `@ecommerce/db` (and `Buffer`) in the browser graph — `/cart` crashed with "Buffer is not defined". Plain helpers now live in `server/coupons-internals.ts`; `coupons.ts` exports only server fns and imports internals dynamically inside handlers (same rule as `internals.ts`/`payouts-internals.ts`).
