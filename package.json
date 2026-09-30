@@ -9,6 +9,7 @@
     "dev": "pnpm --filter @ecommerce/web dev",
     "build": "pnpm --filter @ecommerce/web build",
     "start": "pnpm --filter @ecommerce/web start",
+    "worker": "pnpm --filter @ecommerce/worker start",
     "lint": "pnpm --filter @ecommerce/web lint",
     "format": "prettier --write .",
     "typecheck": "pnpm -r typecheck",

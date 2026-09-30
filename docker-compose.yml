@@ -10,9 +10,10 @@ services:
       POSTGRES_DB: ecommerce
     ports:
       - "5432:5432"
+    # No init scripts: migration 0003_enable_extensions creates pg_trgm and
+    # vector, so a fresh or external database converges the same way.
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ecommerce -d ecommerce"]
       interval: 5s
@@ -49,7 +50,12 @@ services:
       - "8888:8888"
     volumes:
       - seaweed_data:/data
-      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    # Inline config: Compose copies it into the container, so no host file
+    # is bind-mounted (bind mounts fail when Docker can't share the drive
+    # the repo lives on, e.g. an external disk that also holds Docker's data).
+    configs:
+      - source: seaweedfs_s3
+        target: /etc/seaweedfs/s3.json
     depends_on: []
 
   mailpit:
@@ -68,3 +74,23 @@ volumes:
   redis_data:
   seaweed_data:
   mailpit_data:
+
+configs:
+  # S3 identities for local dev (keys match .env.example S3_ACCESS_KEY/SECRET)
+  seaweedfs_s3:
+    content: |
+      {
+        "identities": [
+          {
+            "name": "ecommerce",
+            "credentials": [
+              { "accessKey": "ecommerce-dev", "secretKey": "ecommerce-dev-secret" }
+            ],
+            "actions": ["Admin", "Read", "Write", "List"]
+          },
+          {
+            "name": "anonymous",
+            "actions": ["Read"]
+          }
+        ]
+      }

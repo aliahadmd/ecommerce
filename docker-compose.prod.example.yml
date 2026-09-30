@@ -1,7 +1,36 @@
 # Reference only — production is deployed via Dokploy (see README "Deploying
 # later"). This file shows the env wiring against EXTERNAL services; the app
-# image is built from the repo Dockerfile.
+# and worker images are built from the repo Dockerfiles.
+#
+# Both services share one env block: getEnv() validates the full production
+# contract at boot in every process (packages/config/src/env.ts), so the
+# worker needs the same variables as the app.
 name: ecommerce-prod
+
+x-env: &shared-env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL} # external managed Postgres 17 + pgvector
+  REDIS_URL: ${REDIS_URL} # external Redis 7
+  S3_ENDPOINT: ${S3_ENDPOINT} # external S3 (or SeaweedFS/Minio)
+  S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+  S3_BUCKET: ${S3_BUCKET}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  SMTP_HOST: ${SMTP_HOST} # external SMTP provider
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER}
+  SMTP_PASS: ${SMTP_PASS}
+  EMAIL_FROM: ${EMAIL_FROM}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+  BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-z-ai/glm-4.6}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-fake}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  CURRENCY: ${CURRENCY:-USD}
+  SHIPPING_FEE_CENTS: ${SHIPPING_FEE_CENTS:-0}
 
 services:
   app:
@@ -9,49 +38,19 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      NODE_ENV: production
+      <<: *shared-env
       PORT: "3000"
-      DATABASE_URL: ${DATABASE_URL} # external managed Postgres 17 + pgvector
-      REDIS_URL: ${REDIS_URL} # external Redis 7
-      S3_ENDPOINT: ${S3_ENDPOINT} # external S3 (or SeaweedFS/Minio)
-      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_REGION: ${S3_REGION:-us-east-1}
-      SMTP_HOST: ${SMTP_HOST} # external SMTP provider
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      EMAIL_FROM: ${EMAIL_FROM}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      AI_MODEL: ${AI_MODEL:-z-ai/glm-4.6}
-      CURRENCY: ${CURRENCY:-USD}
     ports:
       - "3000:3000"
+    # healthcheck: built into the image (GET /api/health)
+
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
     environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
+      <<: *shared-env
     depends_on:
       app:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+    # healthcheck: built into the image (heartbeat file, no HTTP port)

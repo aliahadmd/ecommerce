@@ -4,7 +4,7 @@ packages:
 
 allowBuilds:
   esbuild: true
-  msgpackr-extract: set this to true or false
+  msgpackr-extract: false # optional native speed-up for bullmq; the JS fallback is fine
   unrs-resolver: true
 
 dedupePeerDependents: false

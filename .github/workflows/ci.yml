@@ -14,9 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -50,16 +48,25 @@ jobs:
         ports: ["8025:8025", "1025:1025"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Object storage (README #1): /api/health and the seed both need S3.
+      # Same definition as local dev (docker-compose.yml, inline S3 config).
+      - name: Start SeaweedFS (S3)
+        run: |
+          docker compose up -d seaweedfs
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:8333/ && exit 0
+            sleep 2
+          done
+          docker compose logs seaweedfs; exit 1
       - name: Install Playwright chromium
-        run: cd apps/web && npx playwright install --with-deps chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
       - name: Migrate + seed
         run: |
           pnpm db:migrate
@@ -71,12 +78,14 @@ jobs:
       - name: Run Playwright e2e
         run: |
           pnpm dev &
-          npx wait-on http://localhost:3000/api/health -t 60000
-          npx playwright test
+          pnpm worker &
+          npx wait-on http://localhost:3000/api/health -t 120000
+          cd apps/web && npx playwright test
         env:
           DATABASE_URL: postgres://ecommerce:ecommerce@localhost:5432/ecommerce
           REDIS_URL: redis://localhost:6379
           S3_ENDPOINT: http://localhost:8333
+          S3_PUBLIC_URL: http://localhost:8333/products
           SMTP_HOST: localhost
           SMTP_PORT: 1025
       - uses: actions/upload-artifact@v4
@@ -91,12 +100,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Build image
+      - name: Build web image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
           tags: ecommerce-web:ci
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          tags: ecommerce-worker:ci
 
   publish:
     runs-on: ubuntu-latest
@@ -112,8 +128,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # GHCR image names must be lowercase
+      - name: Image prefix
+        id: img
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/web:latest,ghcr.io/${{ github.repository }}/web:${{ github.sha }}
+          tags: ${{ steps.img.outputs.prefix }}/web:latest,${{ steps.img.outputs.prefix }}/web:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: true
+          tags: ${{ steps.img.outputs.prefix }}/worker:latest,${{ steps.img.outputs.prefix }}/worker:${{ github.sha }}
