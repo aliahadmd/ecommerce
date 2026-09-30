@@ -130,6 +130,8 @@ function ProductDetailPage() {
     selected: selectedVariant,
     isValueSelectable,
   } = useVariantSelection(productVariants)
+  // the real ceiling is the chosen variant's stock, not the product aggregate
+  const maxQty = selectedVariant ? selectedVariant.stock : product.stock
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -257,9 +259,9 @@ function ProductDetailPage() {
                 variant="outline"
                 size="icon"
                 aria-label="Increase quantity"
-                disabled={product.stock === 0 || quantity >= product.stock}
+                disabled={maxQty === 0 || quantity >= maxQty}
                 onClick={() =>
-                  setQuantity((q) => Math.min(product.stock, q + 1))
+                  setQuantity((q) => Math.min(maxQty, q + 1))
                 }
               >
                 +

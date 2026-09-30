@@ -1,45 +1,20 @@
 import { createServerFn } from "@tanstack/react-start"
-import { z } from "zod"
 import { db, schema, eq, isNotNull, desc, sql } from "@ecommerce/db"
+import { MAX_IMAGE_BYTES } from "@ecommerce/storage"
 import { AppError, guard, requireRole, requireUser } from "./session"
+import {
+  SETTINGS_KEY,
+  readStoreSettings,
+  settingsSchema,
+} from "./settings-internals"
+import type { StoreSettings } from "./settings-internals"
+
+export type { StoreSettings }
 
 // ── settings (admin) ─────────────────────────────────────────────────────────
 
-const SETTINGS_KEY = "store.settings"
-
-export interface StoreSettings {
-  mode: "open" | "maintenance"
-  signupsEnabled: boolean
-  commissionRate: number // percent 0–50
-  contactEmail: string
-}
-
-const DEFAULTS: StoreSettings = {
-  mode: "open",
-  signupsEnabled: true,
-  commissionRate: 10,
-  contactEmail: "support@dev.local",
-}
-
-const settingsSchema = z.object({
-  mode: z.enum(["open", "maintenance"]),
-  signupsEnabled: z.boolean(),
-  commissionRate: z.number().int().min(0).max(50),
-  contactEmail: z.string().email(),
-})
-
 export const getStoreSettings = createServerFn({ method: "GET" }).handler(
-  () =>
-    guard(async () => {
-      const [row] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, SETTINGS_KEY))
-        .limit(1)
-      if (!row) return DEFAULTS
-      const parsed = settingsSchema.safeParse(row.value)
-      return parsed.success ? parsed.data : DEFAULTS
-    })
+  () => guard(() => readStoreSettings())
 )
 
 export const updateStoreSettings = createServerFn({ method: "POST" })
@@ -60,7 +35,6 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
           target: schema.settings.key,
           set: { value: data, updatedAt: new Date() },
         })
-      void getStoreSettings
       return { ok: true }
     })
   )
@@ -78,7 +52,7 @@ export const uploadReviewPhoto = createServerFn({ method: "POST" })
       if (!isAllowedImageMime(file.type)) {
         throw new AppError("INVALID", "Only JPEG, PNG or WebP images are allowed")
       }
-      if (file.size > 5 * 1024 * 1024) {
+      if (file.size > MAX_IMAGE_BYTES) {
         throw new AppError("INVALID", "Image must be 5MB or smaller")
       }
       const [review] = await db
@@ -95,11 +69,16 @@ export const uploadReviewPhoto = createServerFn({ method: "POST" })
         throw new AppError("INVALID", "Max 3 photos per review")
       }
 
-      const { uploadImage, publicUrl } = await import("@ecommerce/storage")
+      const { uploadImage, publicUrl, sniffImageMime } = await import("@ecommerce/storage")
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const mime = sniffImageMime(bytes) // README #3: type by content
+      if (!mime) {
+        throw new AppError("INVALID", "Only JPEG, PNG or WebP images are allowed")
+      }
       const key = `reviews/${reviewId}/${crypto.randomUUID()}.${
-        file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"
+        mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg"
       }`
-      await uploadImage(key, new Uint8Array(await file.arrayBuffer()), file.type)
+      await uploadImage(key, bytes, mime)
       const url = publicUrl(key)
       const next = [...photos, { key, url }]
       await db
@@ -194,4 +173,3 @@ export const listReportedReviews = createServerFn({ method: "GET" }).handler(() 
 function isAllowedImageMime(mime: string): boolean {
   return ["image/jpeg", "image/png", "image/webp"].includes(mime)
 }
-void requireRole

@@ -154,7 +154,7 @@ function CheckoutPage() {
     )
   }
 
-  const currency = cart.items[0]?.currency ?? "USD"
+  const currency = cart.currency
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">

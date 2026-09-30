@@ -12,7 +12,6 @@ import {
 import { shops } from "./shops"
 import { users } from "./auth"
 import { orders } from "./commerce"
-import { carts } from "./commerce"
 
 export const discountKind = pgEnum("discount_kind", [
   "percent",
@@ -73,6 +72,3 @@ export const couponRedemptions = pgTable(
   },
   (t) => [index("coupon_redemptions_coupon_user_idx").on(t.couponId, t.userId)],
 )
-
-// carts.coupon_id added via raw statement in the migration
-export const cartCouponRef = { carts }

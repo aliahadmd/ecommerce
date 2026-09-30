@@ -1,4 +1,4 @@
-import { index, integer, pgEnum, pgTable, text, timestamp, uuid, char } from "drizzle-orm/pg-core"
+import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, char } from "drizzle-orm/pg-core"
 import { orders, paymentMethod } from "./commerce"
 
 
@@ -34,7 +34,9 @@ export const payments = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index("payments_order_idx").on(t.orderId)],
+  // exactly one payment per order: retries and COD↔card switches update it
+  // in place (plan 002)
+  (t) => [uniqueIndex("payments_order_uq").on(t.orderId)],
 )
 
 export const paymentEvents = pgTable("payment_events", {

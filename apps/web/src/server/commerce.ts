@@ -1,8 +1,11 @@
 import { createServerFn } from "@tanstack/react-start"
-import { db, schema, and, asc, desc, eq, gte, inArray, sql } from "@ecommerce/db"
+import { db, schema, and, asc, desc, eq, gte, inArray, isNull, sql } from "@ecommerce/db"
 import { formatMoney, getEnv } from "@ecommerce/config"
 import type { OrderEmailItem } from "@ecommerce/email"
+import { splitOrder } from "@/lib/order-split"
+import { LIST_PAGE_SIZE, pageInput } from "@/lib/pagination"
 import { recomputeProductAggregates } from "./internals"
+import { assertStoreOpen } from "./settings-internals"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
 // ─── Cart ───────────────────────────────────────────────────────────────────
@@ -67,6 +70,8 @@ export const getCart = createServerFn({ method: "GET" }).handler(() =>
       items,
       subtotalCents,
       count: items.reduce((n, i) => n + i.quantity, 0),
+      // store currency (orders are charged in it) — not a UI "USD" fallback
+      currency: getEnv().CURRENCY,
     }
   })
 )
@@ -92,6 +97,7 @@ const cartTarget = createServerFn({ method: "POST" }).validator(
 export const addToCart = cartTarget.handler(({ data }) =>
   guard(async () => {
     const user = await requireUser()
+    await assertStoreOpen(user)
     const [product] = await db
       .select({
         id: schema.products.id,
@@ -112,22 +118,53 @@ export const addToCart = cartTarget.handler(({ data }) =>
       throw new AppError("NOT_FOUND", "This product is not available")
     }
 
+    // Bind the line to a sellable variant of THIS product (plan 004): a
+    // variant id from another product, or an inactive one, is rejected; a
+    // product with variants needs one chosen (or has exactly one).
+    const activeVariants = await db
+      .select({
+        id: schema.productVariants.id,
+        stock: schema.productVariants.stock,
+      })
+      .from(schema.productVariants)
+      .where(
+        and(
+          eq(schema.productVariants.productId, product.id),
+          eq(schema.productVariants.status, "active")
+        )
+      )
+    let variant: { id: string; stock: number } | null = null
+    if (data.variantId) {
+      variant = activeVariants.find((v) => v.id === data.variantId) ?? null
+      if (!variant) throw new AppError("INVALID", "That option is not available")
+    } else if (activeVariants.length === 1) {
+      variant = activeVariants[0]
+    } else if (activeVariants.length > 1) {
+      throw new AppError("INVALID", "Choose an option first")
+    }
+    const available = variant ? variant.stock : product.stock
+
     const cart = await ensureCart(user.id)
+    // merge only into the SAME product+variant line (M1: matching on the
+    // product alone bumped another variant's quantity)
     const [existing] = await db
       .select()
       .from(schema.cartItems)
       .where(
         and(
           eq(schema.cartItems.cartId, cart.id),
-          eq(schema.cartItems.productId, product.id)
+          eq(schema.cartItems.productId, product.id),
+          variant
+            ? eq(schema.cartItems.variantId, variant.id)
+            : isNull(schema.cartItems.variantId)
         )
       )
       .limit(1)
     const requested = (existing?.quantity ?? 0) + data.quantity
-    if (requested > product.stock) {
+    if (requested > available) {
       throw new AppError(
         "OUT_OF_STOCK",
-        `Only ${product.stock} left of "${product.title}"`
+        `Only ${available} left of "${product.title}"`
       )
     }
     if (existing) {
@@ -136,14 +173,12 @@ export const addToCart = cartTarget.handler(({ data }) =>
         .set({ quantity: requested })
         .where(eq(schema.cartItems.id, existing.id))
     } else {
-      await db
-        .insert(schema.cartItems)
-        .values({
-          cartId: cart.id,
-          productId: product.id,
-          variantId: data.variantId,
-          quantity: data.quantity,
-        })
+      await db.insert(schema.cartItems).values({
+        cartId: cart.id,
+        productId: product.id,
+        variantId: variant?.id ?? null,
+        quantity: data.quantity,
+      })
     }
     const items = await loadCartItems(cart.id)
     return { count: items.reduce((n, i) => n + i.quantity, 0) }
@@ -189,12 +224,20 @@ export const updateCartItem = cartItemTarget.handler(({ data }) =>
       return { removed: true }
     }
     if (data.quantity !== undefined) {
+      // the line's real constraint: its variant's stock when it has one
       const [product] = await db
-        .select({ stock: schema.products.stock, title: schema.products.title })
+        .select({
+          stock: sql<number>`coalesce(${schema.productVariants.stock}, ${schema.products.stock})`,
+          title: schema.products.title,
+        })
         .from(schema.cartItems)
         .innerJoin(
           schema.products,
           eq(schema.cartItems.productId, schema.products.id)
+        )
+        .leftJoin(
+          schema.productVariants,
+          eq(schema.cartItems.variantId, schema.productVariants.id)
         )
         .where(eq(schema.cartItems.id, item.id))
         .limit(1)
@@ -354,6 +397,12 @@ export const placeOrder = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
+      await assertStoreOpen(user)
+      // release stock held by abandoned card checkouts first (H5)
+      const { expireUnpaidCardOrders } = await import("./order-lifecycle")
+      await expireUnpaidCardOrders().catch((err) =>
+        console.error("[orders] expiry sweep failed:", err)
+      )
       const [address] = await db
         .select()
         .from(schema.addresses)
@@ -378,6 +427,7 @@ export const placeOrder = createServerFn({ method: "POST" })
       // Coupon pre-validation (plan-4): re-check window/limits/scope and
       // compute the discount. Final validation + redemption happen in-tx.
       let couponId: string | null = null
+      let couponShopId: string | null = null
       let discountCents = 0
       let freeShipping = false
       {
@@ -388,19 +438,14 @@ export const placeOrder = createServerFn({ method: "POST" })
           .limit(1)
         if (cartRow?.couponId) {
           const { validateCouponForCheckout } = await import("./coupons-internals")
-          const subtotal = items.reduce(
-            (sum, i) => sum + i.priceCents * i.quantity,
-            0
-          )
-          const shopIds = [...new Set(items.map((i) => i.shopId))]
           const validated = await validateCouponForCheckout(
             cartRow.couponId,
             user.id,
-            subtotal,
-            shopIds
+            items
           )
           discountCents = validated.discountCents
           freeShipping = validated.freeShipping
+          couponShopId = validated.shopId
           couponId = cartRow.couponId
         }
       }
@@ -443,6 +488,30 @@ export const placeOrder = createServerFn({ method: "POST" })
           }
         }
 
+        // a variant-less line for a product that now has variants would
+        // decrement the derived product aggregate (overwritten on the next
+        // recompute → oversell); make the buyer pick an option instead
+        const legacyIds = items.filter((i) => !i.variantId).map((i) => i.productId)
+        if (legacyIds.length > 0) {
+          const [withVariant] = await tx
+            .select({ productId: schema.productVariants.productId })
+            .from(schema.productVariants)
+            .where(
+              and(
+                inArray(schema.productVariants.productId, legacyIds),
+                eq(schema.productVariants.status, "active")
+              )
+            )
+            .limit(1)
+          if (withVariant) {
+            const line = items.find((i) => i.productId === withVariant.productId)
+            throw new AppError(
+              "UNAVAILABLE",
+              `"${line?.title ?? "An item"}" now comes in options — remove it and add it again`
+            )
+          }
+        }
+
         const variantProductIds = new Set<string>()
         for (const item of items) {
           if (item.variantId) {
@@ -453,6 +522,8 @@ export const placeOrder = createServerFn({ method: "POST" })
               .where(
                 and(
                   eq(schema.productVariants.id, item.variantId),
+                  // plan 004: never decrement another product's variant
+                  eq(schema.productVariants.productId, item.productId),
                   eq(schema.productVariants.status, "active"),
                   gte(schema.productVariants.stock, item.quantity)
                 )
@@ -464,12 +535,7 @@ export const placeOrder = createServerFn({ method: "POST" })
                 `"${item.title}" only has ${item.stock} left — adjust your cart`
               )
             }
-            const [prod] = await tx
-              .select({ productId: schema.productVariants.productId })
-              .from(schema.productVariants)
-              .where(eq(schema.productVariants.id, item.variantId))
-              .limit(1)
-            if (prod) variantProductIds.add(prod.productId)
+            variantProductIds.add(item.productId)
           } else {
             // Legacy product-level decrement
             const updated = await tx
@@ -554,47 +620,41 @@ export const placeOrder = createServerFn({ method: "POST" })
         }
 
 
-        // Per-shop sub-orders (plan-2): one per distinct shop; shipping goes
-        // to the first sub-order so cents sum exactly. Items are inserted with
-        // their subOrderId stamped directly (audit fix: the old update-before-
-        // insert left sub_order_id NULL).
-        type ItemInsert = (typeof orderItems)[number]
-        const byShop = new Map<string, ItemInsert[]>()
+        // Per-shop sub-orders (plan-2): one per distinct shop. The pure
+        // splitOrder allocates shipping + discount so cents sum exactly and a
+        // shop-scoped coupon only discounts its own shop (H4). Items are
+        // inserted with their subOrderId stamped directly.
+        const shopSubtotals = new Map<string, number>()
         for (const item of orderItems) {
-          const list: ItemInsert[] = byShop.get(item.shopId) ?? []
-          list.push(item)
-          byShop.set(item.shopId, list)
-        }
-        let shippingLeft = shippingTotal
-        let discountLeft = discountCents
-        let subOrderIdx = 0
-        const subOrderIdByShop = new Map<string, string>()
-        for (const [shopId, shopItems] of byShop) {
-          const sub = shopItems.reduce(
-            (sum, i) => sum + i.totalCents,
-            0
+          shopSubtotals.set(
+            item.shopId,
+            (shopSubtotals.get(item.shopId) ?? 0) + item.totalCents
           )
-          const shipShare = Math.min(shippingLeft, shippingTotal)
-          shippingLeft -= shipShare
-          const isLast = subOrderIdx === byShop.size - 1
-          const discountShare = isLast
-            ? discountLeft
-            : Math.floor((sub / Math.max(1, subtotalCents)) * discountCents)
-          discountLeft -= discountShare
-          subOrderIdx += 1
+        }
+        const split = splitOrder({
+          shops: [...shopSubtotals].map(([shopId, subtotal]) => ({
+            shopId,
+            subtotalCents: subtotal,
+          })),
+          shippingCents: shippingTotal,
+          discountCents,
+          discountShopId: couponShopId,
+        })
+        const subOrderIdByShop = new Map<string, string>()
+        for (const s of split) {
           const [subOrder] = await tx
             .insert(schema.subOrders)
             .values({
               orderId: order.id,
-              shopId,
+              shopId: s.shopId,
               status: "pending",
-              subtotalCents: sub,
-              shippingCents: shipShare,
-              discountCents: discountShare,
-              totalCents: sub + shipShare - discountShare,
+              subtotalCents: s.subtotalCents,
+              shippingCents: s.shippingCents,
+              discountCents: s.discountCents,
+              totalCents: s.totalCents,
             })
             .returning({ id: schema.subOrders.id })
-          subOrderIdByShop.set(shopId, subOrder.id)
+          subOrderIdByShop.set(s.shopId, subOrder.id)
         }
         await tx.insert(schema.orderItems).values(
           orderItems.map((i) => ({
@@ -606,9 +666,23 @@ export const placeOrder = createServerFn({ method: "POST" })
         await tx
           .delete(schema.cartItems)
           .where(eq(schema.cartItems.cartId, cart.id))
+        // the coupon is settled (or was invalid — either way it must not ride
+        // along on the buyer's next cart)
+        await tx
+          .update(schema.carts)
+          .set({ couponId: null })
+          .where(eq(schema.carts.id, cart.id))
         if (couponId) {
-          // per-user limit enforced inside the tx (race-safe with the unique
-          // per-user constraints of the flow)
+          // lock the coupon row first: concurrent checkouts serialize here, so
+          // the count checks below are exact
+          const [coupon] = await tx
+            .select({
+              maxUses: schema.coupons.maxUses,
+              maxUsesPerUser: schema.coupons.maxUsesPerUser,
+            })
+            .from(schema.coupons)
+            .where(eq(schema.coupons.id, couponId))
+            .for("update")
           const [{ mine }] = await tx
             .select({ mine: sql<number>`count(*)::int` })
             .from(schema.couponRedemptions)
@@ -618,15 +692,15 @@ export const placeOrder = createServerFn({ method: "POST" })
                 eq(schema.couponRedemptions.userId, user.id)
               )
             )
-          // lock the coupon row: concurrent checkouts serialize here, so the
-          // count checks below are exact (plan-4 race fix)
-          const [coupon] = await tx
-            .select({ maxUsesPerUser: schema.coupons.maxUsesPerUser, maxUses: schema.coupons.maxUses })
-            .from(schema.coupons)
-            .where(eq(schema.coupons.id, couponId))
-            .for("update")
+          const [{ total }] = await tx
+            .select({ total: sql<number>`count(*)::int` })
+            .from(schema.couponRedemptions)
+            .where(eq(schema.couponRedemptions.couponId, couponId))
           if (!coupon || mine >= coupon.maxUsesPerUser) {
             throw new AppError("INVALID", "You already used this coupon")
+          }
+          if (coupon.maxUses !== null && total >= coupon.maxUses) {
+            throw new AppError("INVALID", "This coupon has reached its usage limit")
           }
           await tx.insert(schema.couponRedemptions).values({
             couponId,
@@ -639,8 +713,6 @@ export const placeOrder = createServerFn({ method: "POST" })
         for (const pid of variantProductIds) {
           await recomputeProductAggregates(tx, pid)
         }
-        const { enqueueEmail } = await import("@ecommerce/jobs")
-        void enqueueEmail
         return order
       })
 
@@ -717,17 +789,20 @@ const orderListColumns = {
   itemCount: sql<number>`(select coalesce(sum(oi.quantity),0)::int from order_items oi where oi.order_id = "orders"."id")`,
 }
 
-export const listMyOrders = createServerFn({ method: "GET" }).handler(() =>
-  guard(async () => {
-    const user = await requireUser()
-    return db
-      .select(orderListColumns)
-      .from(schema.orders)
-      .where(eq(schema.orders.buyerId, user.id))
-      .orderBy(desc(schema.orders.createdAt))
-      .limit(50)
-  })
-)
+export const listMyOrders = createServerFn({ method: "GET" })
+  .validator(pageInput)
+  .handler(({ data }) =>
+    guard(async () => {
+      const user = await requireUser()
+      return db
+        .select(orderListColumns)
+        .from(schema.orders)
+        .where(eq(schema.orders.buyerId, user.id))
+        .orderBy(desc(schema.orders.createdAt))
+        .limit(LIST_PAGE_SIZE)
+        .offset((data.page - 1) * LIST_PAGE_SIZE)
+    })
+  )
 
 export const getMyOrder = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
@@ -777,13 +852,20 @@ export const getMyOrder = createServerFn({ method: "GET" })
         })
         .from(schema.orderItems)
         .where(eq(schema.orderItems.orderId, order.id))
-      return { order, items, subOrders }
+      const [payment] = await db
+        .select({ method: schema.payments.method, state: schema.payments.state })
+        .from(schema.payments)
+        .where(eq(schema.payments.orderId, order.id))
+        .limit(1)
+      return { order, items, subOrders, payment: payment ?? null }
     })
   )
 
 // ─── Orders: seller & admin ─────────────────────────────────────────────────
 
-export const listAllOrders = createServerFn({ method: "GET" }).handler(() =>
+export const listAllOrders = createServerFn({ method: "GET" })
+  .validator(pageInput)
+  .handler(({ data }) =>
   guard(async () => {
     await requireRole("super_admin")
     return db
@@ -800,7 +882,8 @@ export const listAllOrders = createServerFn({ method: "GET" }).handler(() =>
       .from(schema.orders)
       .innerJoin(schema.users, eq(schema.orders.buyerId, schema.users.id))
       .orderBy(desc(schema.orders.createdAt))
-      .limit(100)
+      .limit(LIST_PAGE_SIZE)
+      .offset((data.page - 1) * LIST_PAGE_SIZE)
   })
 )
 

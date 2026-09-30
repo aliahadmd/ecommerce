@@ -1,25 +1,30 @@
 # Background worker (BullMQ email + notification queues). Same codebase as the
-# web app; runs the worker entry instead of the HTTP server.
+# web app; runs the worker entry (TypeScript via tsx) instead of the HTTP
+# server. Build context = repo root.
 FROM node:22-alpine AS base
 RUN corepack enable
 WORKDIR /repo
 
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY apps/worker/package.json apps/worker/
-COPY packages/config/package.json packages/config/
-COPY packages/db/package.json packages/db/
-COPY packages/redis/package.json packages/redis/
-COPY packages/email/package.json packages/email/
-COPY packages/jobs/package.json packages/jobs/
 RUN pnpm fetch
 
-FROM base AS runtime
+FROM deps AS build
+COPY . .
+# Install only the worker and its workspace dependencies, production deps
+# only (tsx is a runtime dependency of the worker).
+RUN pnpm install --frozen-lockfile --offline --prod --filter "@ecommerce/worker..."
+
+FROM node:22-alpine AS runtime
 WORKDIR /repo
-COPY --from=deps /repo/package.json ./package.json
-COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/packages ./packages
-COPY --from=deps /repo/apps/worker ./apps/worker
+COPY --from=build --chown=node:node /repo/package.json ./package.json
+COPY --from=build --chown=node:node /repo/node_modules ./node_modules
+COPY --from=build --chown=node:node /repo/packages ./packages
+COPY --from=build --chown=node:node /repo/apps/worker ./apps/worker
 USER node
-ENV NODE_ENV=production
-CMD ["pnpm", "--filter", "@ecommerce/worker", "exec", "tsx", "src/index.ts"]
+ENV NODE_ENV=production WORKER_HEARTBEAT_FILE=/tmp/worker-heartbeat
+# Healthy while the heartbeat file is fresher than 60s (see src/index.ts)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD node -e "const s=require('fs').statSync(process.env.WORKER_HEARTBEAT_FILE);process.exit(Date.now()-s.mtimeMs<60000?0:1)"
+WORKDIR /repo/apps/worker
+CMD ["node", "--import", "tsx", "src/index.ts"]

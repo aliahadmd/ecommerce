@@ -2,6 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { toast } from "sonner"
 import { updateSubOrderStatus } from "@/server/sub-orders"
+import { markCodPaid } from "@/server/payments"
+import { paymentAllowsFulfillment } from "@/lib/order-status"
+import type { PaymentState } from "@/lib/order-status"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,11 +26,16 @@ export function SubOrderActions({
   status,
   role,
   onChanged,
+  orderId,
+  payment,
 }: {
   subOrderId: string
   status: Status
   role: "seller" | "admin" | "buyer"
   onChanged?: () => void
+  /** needed for the COD "cash received" action */
+  orderId?: string
+  payment?: { method: "cod" | "card"; state: PaymentState } | null
 }) {
   const queryClient = useQueryClient()
   const [cancelling, setCancelling] = useState(false)
@@ -57,10 +65,31 @@ export function SubOrderActions({
     },
   })
 
+  const cashReceived = useMutation({
+    mutationFn: () => markCodPaid({ data: { orderId: orderId! } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      toast.success("Cash payment recorded")
+      refresh()
+    },
+  })
+
   if (status === "cancelled") return null
   const buttons: React.ReactNode[] = []
+  const canFulfill = paymentAllowsFulfillment(payment ?? null)
 
-  if (status === "pending" && role !== "buyer") {
+  if (role !== "buyer" && !canFulfill && status === "pending") {
+    buttons.push(
+      <span key="awaiting" className="text-muted-foreground self-center text-xs">
+        Awaiting card payment
+      </span>,
+    )
+  }
+
+  if (status === "pending" && role !== "buyer" && canFulfill) {
     buttons.push(
       <Button key="confirm" size="xs" onClick={() => transition.mutate({ status: "confirmed" })}>
         Confirm
@@ -78,6 +107,24 @@ export function SubOrderActions({
     buttons.push(
       <Button key="deliver" size="xs" onClick={() => transition.mutate({ status: "delivered" })}>
         Mark delivered
+      </Button>,
+    )
+  }
+  if (
+    status === "delivered" &&
+    role !== "buyer" &&
+    orderId &&
+    payment?.method === "cod" &&
+    payment.state === "pending_on_delivery"
+  ) {
+    buttons.push(
+      <Button
+        key="cash"
+        size="xs"
+        disabled={cashReceived.isPending}
+        onClick={() => cashReceived.mutate()}
+      >
+        Cash received
       </Button>,
     )
   }

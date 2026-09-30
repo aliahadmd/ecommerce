@@ -3,8 +3,10 @@ import { db, schema, and, desc, eq, inArray, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { recomputeOrderStatus } from "./internals"
 import { enqueueEmail, enqueueNotification } from "@ecommerce/jobs"
-import { canTransition  } from "@/lib/order-machine"
-import type {OrderStatus} from "@/lib/order-machine";
+import { canTransition } from "@/lib/order-machine"
+import type { OrderStatus } from "@/lib/order-machine"
+import { paymentAllowsFulfillment } from "@/lib/order-status"
+import { LIST_PAGE_SIZE, pageInput } from "@/lib/pagination"
 
 async function loadSubOrder(subOrderId: string) {
   const [row] = await db
@@ -27,7 +29,9 @@ async function loadSubOrder(subOrderId: string) {
 
 // ── reads ────────────────────────────────────────────────────────────────────
 
-export const listShopSubOrders = createServerFn({ method: "GET" }).handler(() =>
+export const listShopSubOrders = createServerFn({ method: "GET" })
+  .validator(pageInput)
+  .handler(({ data }) =>
   guard(async () => {
     const user = await requireRole("seller", "super_admin")
     const [shop] = await db
@@ -36,6 +40,11 @@ export const listShopSubOrders = createServerFn({ method: "GET" }).handler(() =>
       .where(eq(schema.shops.ownerId, user.id))
       .limit(1)
     if (!shop) return []
+    // release stock held by abandoned card checkouts (H5) before listing
+    const { expireUnpaidCardOrders } = await import("./order-lifecycle")
+    await expireUnpaidCardOrders().catch((err) =>
+      console.error("[orders] expiry sweep failed:", err),
+    )
     const rows = await db
       .select({
         id: schema.subOrders.id,
@@ -46,13 +55,17 @@ export const listShopSubOrders = createServerFn({ method: "GET" }).handler(() =>
         currency: schema.orders.currency,
         createdAt: schema.subOrders.createdAt,
         buyerName: schema.users.name,
+        paymentMethod: schema.payments.method,
+        paymentState: schema.payments.state,
       })
       .from(schema.subOrders)
       .innerJoin(schema.orders, eq(schema.subOrders.orderId, schema.orders.id))
       .innerJoin(schema.users, eq(schema.orders.buyerId, schema.users.id))
+      .leftJoin(schema.payments, eq(schema.payments.orderId, schema.orders.id))
       .where(eq(schema.subOrders.shopId, shop.id))
       .orderBy(desc(schema.subOrders.createdAt))
-      .limit(100)
+      .limit(LIST_PAGE_SIZE)
+      .offset((data.page - 1) * LIST_PAGE_SIZE)
     // item counts in a second query to keep the SQL simple
     const ids = rows.map((r) => r.id)
     const counts = ids.length
@@ -168,66 +181,13 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
         if (!data.reason) {
           throw new AppError("INVALID", "A cancellation reason is required")
         }
-        await db.transaction(async (tx) => {
-          await tx
-            .update(schema.subOrders)
-            .set({ status: "cancelled", cancelReason: data.reason })
-            .where(eq(schema.subOrders.id, data.subOrderId))
-          // restore stock for this sub-order's items
-          const items = await tx
-            .select({
-              productId: schema.orderItems.productId,
-              variantId: schema.orderItems.variantId,
-              quantity: schema.orderItems.quantity,
-            })
-            .from(schema.orderItems)
-            .where(eq(schema.orderItems.subOrderId, data.subOrderId))
-          const { notifyBackInStock, recomputeProductAggregates } = await import(
-            "./internals"
-          )
-          const variantProductIds = new Set<string>()
-          for (const item of items) {
-            if (item.variantId) {
-              await tx
-                .update(schema.productVariants)
-                .set({ stock: sql`${schema.productVariants.stock} + ${item.quantity}` })
-                .where(eq(schema.productVariants.id, item.variantId))
-              variantProductIds.add(item.productId)
-            } else {
-              await tx
-                .update(schema.products)
-                .set({ stock: sql`${schema.products.stock} + ${item.quantity}` })
-                .where(eq(schema.products.id, item.productId))
-            }
-          }
-          for (const pid of variantProductIds) {
-            await recomputeProductAggregates(tx, pid)
-          }
-          // back-in-stock notifications for wishlist watchers (plan-6)
-          for (const pid of variantProductIds) {
-            void notifyBackInStock(pid)
-          }
-          await recomputeOrderStatus(tx, row.sub.orderId)
-          // if every sub-order is now cancelled, void the payment (plan-3)
-          const [{ remaining }] = await tx
-            .select({ remaining: sql<number>`count(*) FILTER (WHERE status <> 'cancelled')::int` })
-            .from(schema.subOrders)
-            .where(eq(schema.subOrders.orderId, row.sub.orderId))
-          if ((remaining ?? 0) === 0) {
-            await tx
-              .update(schema.payments)
-              .set({ state: "failed" })
-              .where(
-                and(
-                  eq(schema.payments.orderId, row.sub.orderId),
-                  eq(schema.payments.method, "cod"),
-                  eq(schema.payments.state, "pending_on_delivery")
-                )
-              )
-            const { deriveOrderPaymentStatus } = await import("./payouts-internals")
-            await deriveOrderPaymentStatus(tx, row.sub.orderId)
-          }
-        })
+        const { cancelSubOrderTx, runCancelEffects } = await import(
+          "./order-lifecycle"
+        )
+        const effects = await db.transaction((tx) =>
+          cancelSubOrderTx(tx, data.subOrderId, data.reason!)
+        )
+        await runCancelEffects(effects)
         return { status: "cancelled" as const }
       }
 
@@ -251,11 +211,36 @@ export const updateSubOrderStatus = createServerFn({ method: "POST" })
           `Cannot move a sub-order from ${row.sub.status} to ${data.status}`,
         )
       }
+      // H5: an unpaid card order must not be fulfilled (or credited)
+      const [payment] = await db
+        .select({ method: schema.payments.method, state: schema.payments.state })
+        .from(schema.payments)
+        .where(eq(schema.payments.orderId, row.sub.orderId))
+        .limit(1)
+      if (!paymentAllowsFulfillment(payment ?? null)) {
+        throw new AppError(
+          "INVALID",
+          "This order is awaiting card payment — it can't be fulfilled yet",
+        )
+      }
       await db.transaction(async (tx) => {
-        await tx
+        // guarded: a concurrent transition loses instead of double-applying
+        const moved = await tx
           .update(schema.subOrders)
           .set({ status: data.status })
-          .where(eq(schema.subOrders.id, data.subOrderId))
+          .where(
+            and(
+              eq(schema.subOrders.id, data.subOrderId),
+              eq(schema.subOrders.status, row.sub.status),
+            ),
+          )
+          .returning({ id: schema.subOrders.id })
+        if (moved.length === 0) {
+          throw new AppError(
+            "CONFLICT",
+            "This sub-order changed status in the meantime — refresh and try again",
+          )
+        }
         await recomputeOrderStatus(tx, row.sub.orderId)
         if (data.status === "delivered") {
           const { ledgerSaleForSubOrder } = await import("./payouts-internals")

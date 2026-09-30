@@ -42,8 +42,8 @@ function ForgotPasswordPage() {
         <CardContent>
           {sent ? (
             <p className="text-sm">
-              If the email exists, a reset link was sent — check Mailpit at
-              http://localhost:8025.
+              If the email exists, a reset link was sent — check your inbox.
+              {import.meta.env.DEV && " (Dev: Mailpit at http://localhost:8025.)"}
             </p>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">

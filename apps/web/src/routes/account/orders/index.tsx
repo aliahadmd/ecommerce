@@ -1,16 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { listMyOrders } from "@/server/commerce"
 import { unwrap } from "@/lib/unwrap"
+import { Pager } from "@/components/pager"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 
 export const Route = createFileRoute("/account/orders/")({
   loader: async ({ context: { queryClient } }) => {
     await queryClient.ensureQueryData({
-      queryKey: ["my-orders"],
-      queryFn: () => listMyOrders().then(unwrap),
+      queryKey: ["my-orders", 1],
+      queryFn: () => listMyOrders({ data: { page: 1 } }).then(unwrap),
     })
   },
   component: MyOrdersPage,
@@ -24,9 +27,10 @@ const statusVariant = (s: string) =>
       : "secondary"
 
 function MyOrdersPage() {
+  const [page, setPage] = useState(1)
   const { data: orders } = useQuery({
-    queryKey: ["my-orders"],
-    queryFn: () => listMyOrders().then(unwrap),
+    queryKey: ["my-orders", page],
+    queryFn: () => listMyOrders({ data: { page } }).then(unwrap),
   })
 
   return (
@@ -68,6 +72,7 @@ function MyOrdersPage() {
           </p>
         )}
       </div>
+      <Pager page={page} onPage={setPage} count={orders?.length ?? 0} pageSize={LIST_PAGE_SIZE} />
     </main>
   )
 }

@@ -1,12 +1,15 @@
 import { createServerFn } from "@tanstack/react-start"
 import { db, schema, and, desc, eq } from "@ecommerce/db"
-import { signFakeCallback } from "@ecommerce/payments"
 import * as paymentsPkg from "@ecommerce/payments"
 import { AppError, guard, requireRole, requireUser } from "./session"
 
-const FAKE = "fake"
-
-/** Create (or reuse) the payment row for an order. COD stays cash-based. */
+/**
+ * Create, reuse or retry the payment for an order (plan 002).
+ * - succeeded/refunded payments are final — never re-opened
+ * - a failed card attempt gets a fresh intent (retry)
+ * - COD ↔ card switches update the single row in place
+ * - cancelled orders cannot be paid (plan 003)
+ */
 export const startCheckoutPayment = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const orderId = String((input as { orderId?: unknown })?.orderId ?? "")
@@ -15,11 +18,13 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
     if (method !== "cod" && method !== "card") {
       throw new AppError("INVALID", "Invalid payment method")
     }
-    return { orderId, method: method }
+    return { orderId, method }
   })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
+      const { assertStoreOpen } = await import("./settings-internals")
+      await assertStoreOpen(user)
       const [order] = await db
         .select()
         .from(schema.orders)
@@ -27,36 +32,61 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
         .limit(1)
       if (!order) throw new AppError("NOT_FOUND", "Order not found")
       if (order.buyerId !== user.id) throw new AppError("FORBIDDEN", "Not your order")
+      if (order.status === "cancelled") {
+        throw new AppError("INVALID", "This order was cancelled")
+      }
 
       const [existing] = await db
         .select()
         .from(schema.payments)
         .where(eq(schema.payments.orderId, order.id))
         .limit(1)
-      if (existing) {
-        if (existing.method === "card" && existing.providerRef && existing.state === "requires_payment") {
-          const provider = paymentsPkg.getProvider()
-          return {
-            method: "card" as const,
-            payUrl: provider.id === FAKE ? `/pay/${existing.providerRef}` : "",
-          }
-        }
+      // money-safety rail: a captured payment is never re-opened
+      if (
+        existing &&
+        ["succeeded", "partially_refunded", "refunded"].includes(existing.state)
+      ) {
         return { method: existing.method, payUrl: "" }
       }
+      const { deriveOrderPaymentStatus } = await import("./payouts-internals")
 
       if (data.method === "cod") {
-        await db.insert(schema.payments).values({
+        if (existing?.method === "cod") return { method: "cod" as const, payUrl: "" }
+        const cod = {
           orderId: order.id,
-          method: "cod",
-          provider: FAKE,
+          method: "cod" as const,
+          provider: "fake",
+          providerRef: null,
           amountCents: order.totalCents,
           currency: order.currency,
-          state: "pending_on_delivery",
+          state: "pending_on_delivery" as const,
+        }
+        await db.transaction(async (tx) => {
+          if (existing) {
+            await tx.update(schema.payments).set(cod).where(eq(schema.payments.id, existing.id))
+          } else {
+            await tx.insert(schema.payments).values(cod)
+          }
+          await tx
+            .update(schema.orders)
+            .set({ paymentMethod: "cod" })
+            .where(eq(schema.orders.id, order.id))
+          await deriveOrderPaymentStatus(tx, order.id)
         })
         return { method: "cod" as const, payUrl: "" }
       }
 
       const provider = paymentsPkg.getProvider()
+      // the fake gateway's intents are stateless refs → reuse a live one
+      if (
+        existing?.method === "card" &&
+        existing.state === "requires_payment" &&
+        existing.providerRef &&
+        provider.id === "fake"
+      ) {
+        return { method: "card" as const, payUrl: `/pay/${existing.providerRef}` }
+      }
+
       const ref = `PAY-${order.orderNumber}-${Date.now().toString(36)}`
       const intent = await provider.createIntent({
         ref,
@@ -64,73 +94,36 @@ export const startCheckoutPayment = createServerFn({ method: "POST" })
         currency: order.currency,
         description: `Order ${order.orderNumber}`,
       })
-      await db.insert(schema.payments).values({
+      const card = {
         orderId: order.id,
-        method: "card",
+        method: "card" as const,
         provider: provider.id,
         providerRef: ref,
         amountCents: order.totalCents,
         currency: order.currency,
-        state: "requires_payment",
+        state: "requires_payment" as const,
+      }
+      await db.transaction(async (tx) => {
+        if (existing) {
+          await tx.update(schema.payments).set(card).where(eq(schema.payments.id, existing.id))
+        } else {
+          await tx.insert(schema.payments).values(card)
+        }
+        await tx
+          .update(schema.orders)
+          .set({ paymentMethod: "card" })
+          .where(eq(schema.orders.id, order.id))
+        await deriveOrderPaymentStatus(tx, order.id)
       })
-      void provider
       return { method: "card" as const, payUrl: intent.payUrl }
     }),
   )
 
-/** Fake-gateway callback: HMAC-verified, idempotent. */
-export const fakeGatewayCallback = createServerFn({ method: "POST" })
-  .validator((input: unknown) => {
-    const raw = input as { ref?: unknown; outcome?: unknown; sig?: unknown }
-    const ref = String(raw.ref ?? "")
-    const outcome = String(raw.outcome ?? "")
-    const sig = String(raw.sig ?? "")
-    if (!ref || !outcome || !sig) throw new AppError("INVALID", "Missing fields")
-    return { ref, outcome, sig }
-  })
-  .handler(({ data }) =>
-    guard(async () => {
-      const verified = paymentsPkg.fakeProvider.verifyCallback(data)
-      if (!verified) throw new AppError("UNAUTHORIZED", "Invalid callback signature")
-      const outcome = verified.outcome
-      const [payment] = await db
-        .select()
-        .from(schema.payments)
-        .where(eq(schema.payments.providerRef, data.ref))
-        .limit(1)
-      if (!payment) throw new AppError("NOT_FOUND", "Payment not found")
-      if (payment.state === "succeeded") return { ok: true, state: "succeeded" as const }
-
-      const newState = outcome === "succeeded" ? "succeeded" : "failed"
-      await db.transaction(async (tx) => {
-        await tx
-          .update(schema.payments)
-          .set({ state: newState })
-          .where(eq(schema.payments.id, payment.id))
-        if (newState === "succeeded") {
-          // paid card orders skip the seller-confirm wait: mark sub-orders confirmed
-          await tx
-            .update(schema.subOrders)
-            .set({ status: "confirmed" })
-            .where(
-              and(
-                eq(schema.subOrders.orderId, payment.orderId),
-                eq(schema.subOrders.status, "pending")
-              )
-            )
-          await tx
-            .update(schema.orders)
-            .set({ status: "confirmed" })
-            .where(eq(schema.orders.id, payment.orderId))
-          const { deriveOrderPaymentStatus } = await import("./payouts-internals")
-          await deriveOrderPaymentStatus(tx, payment.orderId)
-        }
-      })
-      return { ok: true, state: newState }
-    }),
-  )
-
-/** Sign a fake-gateway callback (the secret never reaches the client). */
+/**
+ * Sign a fake-gateway callback (the secret never reaches the client). Only
+ * the order's own buyer (or an admin) may sign, and only while the fake
+ * gateway is the active provider (plan 006, M10).
+ */
 export const signCallback = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const raw = input as { ref?: unknown; outcome?: unknown }
@@ -143,12 +136,29 @@ export const signCallback = createServerFn({ method: "POST" })
   })
   .handler(({ data }) =>
     guard(async () => {
-      await requireUser()
-      return { sig: signFakeCallback(data.ref, data.outcome) }
+      if (!paymentsPkg.isFakeGateway()) {
+        throw new AppError("NOT_FOUND", "Payment not found")
+      }
+      const user = await requireUser()
+      const [row] = await db
+        .select({ buyerId: schema.orders.buyerId })
+        .from(schema.payments)
+        .innerJoin(schema.orders, eq(schema.payments.orderId, schema.orders.id))
+        .where(eq(schema.payments.providerRef, data.ref))
+        .limit(1)
+      if (!row) throw new AppError("NOT_FOUND", "Payment not found")
+      if (row.buyerId !== user.id && user.role !== "super_admin") {
+        throw new AppError("FORBIDDEN", "Not your payment")
+      }
+      return { sig: paymentsPkg.signFakeCallback(data.ref, data.outcome) }
     }),
   )
 
-/** "Mark paid (cash)" — COD settlement on delivery. */
+/**
+ * "Cash received" — COD settlement (plan 006). Admins may reconcile any live
+ * order; a seller only an order where their own sub-order was delivered
+ * (cash is collected on delivery — see canMarkPaid in lib/order-machine).
+ */
 export const markCodPaid = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const orderId = String((input as { orderId?: unknown })?.orderId ?? "")
@@ -157,21 +167,59 @@ export const markCodPaid = createServerFn({ method: "POST" })
   })
   .handler(({ data }) =>
     guard(async () => {
-      await requireRole("seller", "super_admin")
-      await db
-        .update(schema.payments)
-        .set({ state: "succeeded" })
-        .where(
-          and(
-            eq(schema.payments.orderId, data.orderId),
-            eq(schema.payments.method, "cod")
+      const user = await requireRole("seller", "super_admin")
+      const [order] = await db
+        .select({ status: schema.orders.status })
+        .from(schema.orders)
+        .where(eq(schema.orders.id, data.orderId))
+        .limit(1)
+      if (!order) throw new AppError("NOT_FOUND", "Order not found")
+      if (order.status === "cancelled") {
+        throw new AppError("INVALID", "This order was cancelled")
+      }
+      if (user.role !== "super_admin") {
+        const [shop] = await db
+          .select({ id: schema.shops.id })
+          .from(schema.shops)
+          .where(eq(schema.shops.ownerId, user.id))
+          .limit(1)
+        if (!shop) throw new AppError("FORBIDDEN", "No shop found for this account")
+        const [own] = await db
+          .select({ status: schema.subOrders.status })
+          .from(schema.subOrders)
+          .where(
+            and(
+              eq(schema.subOrders.orderId, data.orderId),
+              eq(schema.subOrders.shopId, shop.id)
+            )
           )
-        )
+          .limit(1)
+        if (!own) {
+          throw new AppError("FORBIDDEN", "This order has no sub-order from your shop")
+        }
+        if (own.status !== "delivered") {
+          throw new AppError("INVALID", "Mark the order delivered before recording the cash")
+        }
+      }
+
       await db.transaction(async (tx) => {
+        const [payment] = await tx
+          .select()
+          .from(schema.payments)
+          .where(eq(schema.payments.orderId, data.orderId))
+          .for("update")
+          .limit(1)
+        if (!payment || payment.method !== "cod") {
+          throw new AppError("INVALID", "This is not a cash-on-delivery order")
+        }
+        if (payment.state === "succeeded") return // idempotent
+        if (payment.state !== "pending_on_delivery") {
+          throw new AppError("INVALID", "This payment can no longer be collected")
+        }
         await tx
-          .update(schema.orders)
-          .set({ paymentStatus: "paid" })
-          .where(eq(schema.orders.id, data.orderId))
+          .update(schema.payments)
+          .set({ state: "succeeded" })
+          .where(eq(schema.payments.id, payment.id))
         const { deriveOrderPaymentStatus } = await import("./payouts-internals")
         await deriveOrderPaymentStatus(tx, data.orderId)
       })

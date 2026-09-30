@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  CopyObjectCommand,
   CreateBucketCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
@@ -62,6 +63,31 @@ export function isAllowedImageMime(mime: string): boolean {
 }
 
 /**
+ * Detect the real image type from the file's magic bytes. The browser's
+ * declared Content-Type is attacker-controlled, so uploads are typed by
+ * content (README #3). Returns null for anything but JPEG/PNG/WebP.
+ */
+export function sniffImageMime(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
+  const b = bytes;
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (
+    b.length >= 8 &&
+    b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 &&
+    b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && // RIFF
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 // WEBP
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
+/**
  * Key layout encodes ownership: sellers may only touch keys under their own
  * shop/product prefix. User-supplied filenames never reach storage.
  */
@@ -88,4 +114,27 @@ export async function uploadImage(
 
 export async function deleteObject(key: string): Promise<void> {
   await getS3().send(new DeleteObjectCommand({ Bucket: getEnv().S3_BUCKET, Key: key }));
+}
+
+/**
+ * Copy an existing product image to a new key under another product
+ * (product duplication). Each product owns its objects, so deleting an image
+ * on the copy never breaks the original.
+ */
+export async function copyProductImage(
+  srcKey: string,
+  shopId: string,
+  productId: string,
+): Promise<{ key: string; url: string }> {
+  const ext = srcKey.split(".").pop() ?? "jpg";
+  const key = `shops/${shopId}/products/${productId}/${randomUUID()}.${ext}`;
+  const Bucket = getEnv().S3_BUCKET;
+  await getS3().send(
+    new CopyObjectCommand({
+      Bucket,
+      Key: key,
+      CopySource: `${Bucket}/${encodeURI(srcKey)}`,
+    }),
+  );
+  return { key, url: publicUrl(key) };
 }

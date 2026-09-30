@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start"
 import { db, schema, and, desc, eq, gte, inArray, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole } from "./session"
+import { LIST_PAGE_SIZE, pageInput } from "@/lib/pagination"
 
 export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
   guard(async () => {
@@ -72,7 +73,9 @@ export const getAdminStats = createServerFn({ method: "GET" }).handler(() =>
   })
 )
 
-export const adminListUsers = createServerFn({ method: "GET" }).handler(() =>
+export const adminListUsers = createServerFn({ method: "GET" })
+  .validator(pageInput)
+  .handler(({ data }) =>
   guard(async () => {
     await requireRole("super_admin")
     return db
@@ -88,7 +91,8 @@ export const adminListUsers = createServerFn({ method: "GET" }).handler(() =>
       })
       .from(schema.users)
       .orderBy(desc(schema.users.createdAt))
-      .limit(100)
+      .limit(LIST_PAGE_SIZE)
+      .offset((data.page - 1) * LIST_PAGE_SIZE)
   })
 )
 
@@ -170,13 +174,20 @@ export const adminSetUserBanned = createServerFn({ method: "POST" })
       if (admin.id === data.userId) {
         throw new AppError("INVALID", "You cannot ban yourself")
       }
-      await db
-        .update(schema.users)
-        .set({
-          banned: data.banned,
-          banReason: data.banned ? data.reason : null,
-        })
-        .where(eq(schema.users.id, data.userId))
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({
+            banned: data.banned,
+            banReason: data.banned ? data.reason : null,
+          })
+          .where(eq(schema.users.id, data.userId))
+        // L13: a ban ends every live session immediately (the auth endpoints
+        // too, not only our server functions)
+        if (data.banned) {
+          await tx.delete(schema.sessions).where(eq(schema.sessions.userId, data.userId))
+        }
+      })
       // A banned seller's shop must not keep taking orders; unban restores it
       // only if they are still a seller.
       if (data.banned) {

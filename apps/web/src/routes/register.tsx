@@ -58,16 +58,21 @@ function RegisterPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Dev environment: open the{" "}
-              <a
-                href="http://localhost:8025"
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                Mailpit inbox
-              </a>{" "}
-              and click the verification link.
+              Open the email and click the verification link.
+              {import.meta.env.DEV && (
+                <>
+                  {" "}Dev environment: mail lands in the{" "}
+                  <a
+                    href="http://localhost:8025"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    Mailpit inbox
+                  </a>
+                  .
+                </>
+              )}
             </p>
             <Button
               render={<Link to="/login" />}

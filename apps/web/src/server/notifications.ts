@@ -1,13 +1,14 @@
 import { createServerFn } from "@tanstack/react-start"
 import { db, schema, and, desc, eq, isNull, sql } from "@ecommerce/db"
 import { guard, requireUser } from "./session"
+import { toPage } from "@/lib/pagination"
 
 export const listNotifications = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
     const raw = (input ?? {}) as { unreadOnly?: unknown; page?: unknown }
     return {
       unreadOnly: Boolean(raw.unreadOnly),
-      page: Math.max(1, Number(raw.page ?? 1)),
+      page: toPage(raw.page),
     }
   })
   .handler(({ data }) =>

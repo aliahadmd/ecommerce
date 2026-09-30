@@ -1,5 +1,5 @@
 import { index, integer, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
-import { orders, orderItems } from "./commerce"
+import { orders } from "./commerce"
 import { shops } from "./shops"
 
 export const subOrderStatus = pgEnum("sub_order_status", [
@@ -39,7 +39,3 @@ export const subOrders = pgTable(
     index("sub_orders_shop_idx").on(t.shopId, t.status, t.createdAt),
   ],
 )
-
-// order_items.sub_order_id is added via a raw SQL statement in the migration
-// (orderItems table lives in commerce.ts and gains the column there).
-export const subOrderHelpers = { orderItems }

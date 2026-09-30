@@ -4,6 +4,7 @@ import { z } from "zod"
 import { db, schema, and, desc, eq, inArray, sql } from "@ecommerce/db"
 import { recomputeProductRating } from "./internals"
 import { AppError, guard, requireRole, requireUser } from "./session"
+import { toPage } from "@/lib/pagination"
 
 const EDIT_WINDOW_DAYS = 30
 
@@ -40,7 +41,7 @@ export const listReviews = createServerFn({ method: "GET" })
     const raw = input as { productId?: unknown; page?: unknown; sort?: unknown }
     const productId = String(raw.productId ?? "")
     if (!productId) throw new AppError("INVALID", "productId required")
-    const page = Math.max(1, Number(raw.page ?? 1))
+    const page = toPage(raw.page)
     const sort = raw.sort === "helpful" ? "helpful" : "newest"
     return { productId, page, sort }
   })
@@ -60,6 +61,7 @@ export const listReviews = createServerFn({ method: "GET" })
           updatedAt: schema.reviews.updatedAt,
           authorName: schema.users.name,
           userId: schema.reviews.userId,
+          photos: schema.reviews.photos,
         })
         .from(schema.reviews)
         .innerJoin(schema.users, eq(schema.reviews.userId, schema.users.id))
@@ -101,11 +103,15 @@ export const listReviews = createServerFn({ method: "GET" })
       }
 
       return {
-        rows: rows.map((r) => ({
+        rows: rows.map(({ userId, photos, ...r }) => ({
           ...r,
+          photos: photos.map((p) => p.url),
           verifiedPurchase: true, // phase 2 reviews are purchase-only
           edited: r.updatedAt.getTime() - r.createdAt.getTime() > 1000,
           myVote: myVotes.includes(r.id),
+          // viewer flags instead of exposing author user ids publicly
+          mine: viewer?.id === userId,
+          canReport: !!viewer && viewer.id !== userId,
         })),
         total,
         page: data.page,
@@ -259,39 +265,50 @@ export const voteReview = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireUser()
-      const [existing] = await db
-        .select({ userId: schema.reviewVotes.userId })
-        .from(schema.reviewVotes)
-        .where(
-          and(eq(schema.reviewVotes.reviewId, data.reviewId), eq(schema.reviewVotes.userId, user.id)),
-        )
+      const [review] = await db
+        .select({ userId: schema.reviews.userId, status: schema.reviews.status })
+        .from(schema.reviews)
+        .where(eq(schema.reviews.id, data.reviewId))
         .limit(1)
-      await db.transaction(async (tx) => {
-        if (existing) {
-          await tx
-            .delete(schema.reviewVotes)
-            .where(
-              and(
-                eq(schema.reviewVotes.reviewId, data.reviewId),
-                eq(schema.reviewVotes.userId, user.id),
-              ),
-            )
+      if (!review || review.status !== "approved") {
+        throw new AppError("NOT_FOUND", "Review not found")
+      }
+      if (review.userId === user.id) {
+        throw new AppError("INVALID", "You can't vote on your own review")
+      }
+      // L5: the insert/delete result decides the counter move, so two
+      // concurrent clicks can't both increment
+      const voted = await db.transaction(async (tx) => {
+        const removed = await tx
+          .delete(schema.reviewVotes)
+          .where(
+            and(
+              eq(schema.reviewVotes.reviewId, data.reviewId),
+              eq(schema.reviewVotes.userId, user.id),
+            ),
+          )
+          .returning({ userId: schema.reviewVotes.userId })
+        if (removed.length > 0) {
           await tx
             .update(schema.reviews)
             .set({ helpfulCount: sql`greatest(${schema.reviews.helpfulCount} - 1, 0)` })
             .where(eq(schema.reviews.id, data.reviewId))
-        } else {
-          await tx
-            .insert(schema.reviewVotes)
-            .values({ reviewId: data.reviewId, userId: user.id })
-            .onConflictDoNothing()
+          return false
+        }
+        const added = await tx
+          .insert(schema.reviewVotes)
+          .values({ reviewId: data.reviewId, userId: user.id })
+          .onConflictDoNothing()
+          .returning({ userId: schema.reviewVotes.userId })
+        if (added.length > 0) {
           await tx
             .update(schema.reviews)
             .set({ helpfulCount: sql`${schema.reviews.helpfulCount} + 1` })
             .where(eq(schema.reviews.id, data.reviewId))
         }
+        return true
       })
-      return { voted: !existing }
+      return { voted }
     }),
   )
 
@@ -370,7 +387,7 @@ export const adminListReviews = createServerFn({ method: "GET" })
     const status = ["approved", "hidden"].includes(String(raw.status))
       ? (String(raw.status) as "approved" | "hidden")
       : undefined
-    return { status, page: Math.max(1, Number(raw.page ?? 1)) }
+    return { status, page: toPage(raw.page) }
   })
   .handler(({ data }) =>
     guard(async () => {

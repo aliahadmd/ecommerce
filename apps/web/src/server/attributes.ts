@@ -4,6 +4,7 @@ import { z } from "zod"
 import { db, schema, and, asc, eq, inArray, sql } from "@ecommerce/db"
 import type { AttributeValue } from "@ecommerce/db"
 import { slugify, slugWithSuffix } from "@ecommerce/config"
+import { cachedJson } from "@ecommerce/redis"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { isUniqueViolation } from "./catalog"
 
@@ -439,11 +440,15 @@ export const setProductAttributes = createServerFn({ method: "POST" })
 export const getAttributeFacets = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
     const categorySlug = String((input as { categorySlug?: unknown })?.categorySlug ?? "")
-    if (!categorySlug) throw new AppError("INVALID", "categorySlug required")
+    if (!/^[a-z0-9-]{1,100}$/.test(categorySlug)) {
+      throw new AppError("INVALID", "categorySlug required")
+    }
     return { categorySlug }
   })
   .handler(({ data }) =>
-    guard(async () => {
+    // facet counts are an aggregate over the whole category: cache 60s like
+    // the category tree (README #5)
+    guard(() => cachedJson(`catalog:facets:v1:${data.categorySlug}`, 60, async () => {
       const filterable = await db
         .select()
         .from(schema.attributeDefinitions)
@@ -491,5 +496,5 @@ export const getAttributeFacets = createServerFn({ method: "GET" })
             .slice(0, 8),
         }))
         .filter((f) => f.values.length > 0)
-    }),
+    })),
   )

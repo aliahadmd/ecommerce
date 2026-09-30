@@ -8,6 +8,31 @@ import handler from "./dist/server/server.js"
 
 const port = Number(process.env.PORT) || 3000
 const hostname = process.env.HOST || "0.0.0.0"
+// Largest accepted request body (M14). Uploads are capped at 5 MB and CSV
+// imports at 2 MB by the app; multipart framing needs some headroom.
+const maxBodyBytes = Number(process.env.MAX_BODY_BYTES) || 12 * 1024 * 1024
+
+class PayloadTooLarge extends Error {}
+
+function readBody(req) {
+  const declared = Number(req.headers["content-length"] ?? 0)
+  if (declared > maxBodyBytes) return Promise.reject(new PayloadTooLarge())
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    req.on("data", (c) => {
+      size += c.length
+      if (size > maxBodyBytes) {
+        reject(new PayloadTooLarge())
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
+    req.on("end", () => resolve(Buffer.concat(chunks)))
+    req.on("error", reject)
+  })
+}
 
 const server = createServer(async (req, res) => {
   try {
@@ -17,12 +42,7 @@ const server = createServer(async (req, res) => {
     )
     const body =
       req.method !== "GET" && req.method !== "HEAD"
-        ? await new Promise((resolve, reject) => {
-            const chunks = []
-            req.on("data", (c) => chunks.push(c))
-            req.on("end", () => resolve(Buffer.concat(chunks)))
-            req.on("error", reject)
-          })
+        ? await readBody(req)
         : undefined
 
     const request = new Request(url, {
@@ -55,6 +75,11 @@ const server = createServer(async (req, res) => {
     }
     res.end()
   } catch (err) {
+    if (err instanceof PayloadTooLarge) {
+      if (!res.headersSent) res.writeHead(413, { connection: "close" })
+      res.end("Payload Too Large")
+      return
+    }
     console.error("[server] request failed:", err)
     if (!res.headersSent) res.writeHead(500)
     res.end("Internal Server Error")
@@ -64,3 +89,11 @@ const server = createServer(async (req, res) => {
 server.listen(port, hostname, () => {
   console.log(`Server listening on http://${hostname}:${port}`)
 })
+
+// finish in-flight requests on container stop
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, () => {
+    server.close(() => process.exit(0))
+    setTimeout(() => process.exit(0), 10_000).unref()
+  })
+}

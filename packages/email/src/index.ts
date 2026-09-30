@@ -1,4 +1,5 @@
-import nodemailer from "nodemailer";
+import { createTransport } from "nodemailer";
+import type { Mail } from "nodemailer";
 import { getEnv } from "@ecommerce/config";
 
 /**
@@ -6,12 +7,12 @@ import { getEnv } from "@ecommerce/config";
  * SMTP_* env vars change — templates and call sites stay identical.
  */
 
-let transport: nodemailer.Transporter | null = null;
+let transport: Mail | null = null;
 
-function getTransport(): nodemailer.Transporter {
+function getTransport(): Mail {
   if (!transport) {
     const env = getEnv();
-    transport = nodemailer.createTransport({
+    transport = createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
@@ -28,16 +29,12 @@ async function sendMail(options: {
   html: string;
   text: string;
 }): Promise<void> {
-  const env = getEnv();
-  try {
-    await getTransport().sendMail({
-      from: env.EMAIL_FROM,
-      ...options,
-    });
-  } catch (err) {
-    // Emails must never break a user flow (checkout, signup…); log and move on.
-    console.error("[email] failed to send:", options.subject, err);
-  }
+  // Throws on failure so queue workers retry (M4). Callers inside a user
+  // flow (e.g. better-auth hooks) catch and log instead.
+  await getTransport().sendMail({
+    from: getEnv().EMAIL_FROM,
+    ...options,
+  });
 }
 
 function escapeHtml(value: string): string {

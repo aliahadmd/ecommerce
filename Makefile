@@ -1,4 +1,4 @@
-.PHONY: help env install dev build up down reset logs ps migrate seed studio lint fmt typecheck test
+.PHONY: help env install dev worker build up down reset logs ps migrate seed studio lint fmt typecheck test
 
 help: ## list available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -12,6 +12,9 @@ install: ## install workspace dependencies
 
 dev: ## run the web app on the host (infra must be up: make up)
 	pnpm dev
+
+worker: ## run the background job worker (emails, notifications)
+	pnpm worker
 
 build: ## production build of the web app
 	pnpm build

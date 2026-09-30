@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { formatMoney } from "@ecommerce/config"
 import { getMyOrder } from "@/server/commerce"
+import { startCheckoutPayment } from "@/server/payments"
 import { unwrap } from "@/lib/unwrap"
+import { SubOrderActions } from "@/components/sub-order-actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,14 +23,30 @@ export const Route = createFileRoute("/account/orders/$id")({
 
 function OrderDetailPage() {
   const { id } = Route.useParams()
-  const { data } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ["my-order", id],
     queryFn: () => getMyOrder({ data: { id } }).then(unwrap),
+  })
+  // plan 002: a failed or abandoned card payment can be retried from here
+  const pay = useMutation({
+    mutationFn: () => startCheckoutPayment({ data: { orderId: id, method: "card" } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      if (r.data.payUrl) window.location.href = r.data.payUrl
+      else void refetch()
+    },
   })
 
   if (!data)
     return <main className="mx-auto max-w-3xl px-4 py-8">Loading…</main>
-  const { order, items, subOrders } = data
+  const { order, items, subOrders, payment } = data
+  const awaitingCard =
+    payment?.method === "card" &&
+    (payment.state === "requires_payment" || payment.state === "failed") &&
+    order.status !== "cancelled"
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -52,11 +71,26 @@ function OrderDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          {order.status === "pending" && (
-            <p className="rounded-lg bg-muted p-3">
-              Your order is awaiting seller confirmation. Payment is cash on
-              delivery.
-            </p>
+          {awaitingCard ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-3">
+              <span>
+                {payment.state === "failed"
+                  ? "Your card payment didn't go through."
+                  : "This order is waiting for your card payment."}{" "}
+                Unpaid orders are cancelled automatically after a while.
+              </span>
+              <Button size="sm" disabled={pay.isPending} onClick={() => pay.mutate()}>
+                {payment.state === "failed" ? "Retry payment" : "Pay now"}
+              </Button>
+            </div>
+          ) : (
+            order.status === "pending" &&
+            payment?.method !== "card" && (
+              <p className="rounded-lg bg-muted p-3">
+                Your order is awaiting seller confirmation. Payment is cash on
+                delivery.
+              </p>
+            )
           )}
           {subOrders.map((sub) => (
             <div key={sub.id} className="rounded-lg border p-3">
@@ -68,6 +102,14 @@ function OrderDetailPage() {
                 {sub.cancelReason && (
                   <span className="text-xs text-muted-foreground">({sub.cancelReason})</span>
                 )}
+                <div className="ml-auto">
+                  <SubOrderActions
+                    subOrderId={sub.id}
+                    status={sub.status}
+                    role="buyer"
+                    onChanged={() => void refetch()}
+                  />
+                </div>
               </div>
               <div className="grid gap-1">
                 {items

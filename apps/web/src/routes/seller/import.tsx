@@ -12,7 +12,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 
 export const Route = createFileRoute("/seller/import")({
   component: ImportPage,
@@ -30,18 +29,19 @@ function ImportPage() {
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [staged, setStaged] = useState<StageResult | null>(null)
-  const [updateExisting, setUpdateExisting] = useState(false)
 
   const stage = useMutation({
-    mutationFn: (file: File) => stageImport({ data: file }),
+    mutationFn: (file: File) => {
+      const fd = new FormData()
+      fd.append("file", file)
+      return stageImport({ data: fd })
+    },
     onSuccess: (r) => {
-      setStaged({
-        importId: r.importId,
-        total: r.total,
-        valid: r.valid,
-        errorCount: r.errorCount,
-        errors: r.errors,
-      })
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      setStaged(r.data)
     },
     onError: (e) => toast.error(e.message),
   })
@@ -53,7 +53,10 @@ function ImportPage() {
         toast.error(r.error.message)
         return
       }
-      toast.success(`${r.data.created} products imported as drafts`)
+      toast.success(
+        `${r.data.created} products${r.data.variants ? ` and ${r.data.variants} variants` : ""} imported as drafts`,
+      )
+      setStaged(null)
       void queryClient.invalidateQueries({ queryKey: ["seller-products"] })
       void queryClient.invalidateQueries({ queryKey: ["admin-products"] })
     },
@@ -102,7 +105,7 @@ function ImportPage() {
               {staged.total} rows
             </CardTitle>
             <CardDescription>
-              Commit creates products as drafts in your shop.
+              Commit creates products as drafts in your shop, all or nothing.
               Slugs that already exist get a suffix (nothing is overwritten).
             </CardDescription>
           </CardHeader>
@@ -119,18 +122,11 @@ function ImportPage() {
                 </ul>
               </div>
             )}
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={updateExisting}
-                onCheckedChange={(v) => setUpdateExisting(v === true)}
-              />
-              (Reserved) update existing products by slug
-            </label>
             <Button
               onClick={() => commit.mutate()}
               disabled={commit.isPending || staged.valid === 0}
             >
-              {commit.isPending ? "Importing…" : `Import ${staged.valid} products`}
+              {commit.isPending ? "Importing…" : `Import ${staged.valid} rows`}
             </Button>
           </CardContent>
         </Card>

@@ -8,9 +8,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { canReview, createReview, listReviews, voteReview } from "@/server/reviews"
+import { reportReview, uploadReviewPhoto } from "@/server/settings"
 import { unwrap } from "@/lib/unwrap"
-import { ThumbsUp } from "lucide-react"
+import { Flag, ImagePlus, ThumbsUp } from "lucide-react"
 
 export function ProductReviews({ productId }: { productId: string }) {
   const queryClient = useQueryClient()
@@ -230,13 +238,45 @@ interface ReviewRowData {
   verifiedPurchase: boolean
   edited: boolean
   myVote: boolean
+  photos: string[]
+  mine: boolean
+  canReport: boolean
 }
 
+const MAX_REVIEW_PHOTOS = 3
+
 function ReviewRow({ review, onChanged }: { review: ReviewRowData; onChanged: () => void }) {
+  const [reporting, setReporting] = useState(false)
+  const [reason, setReason] = useState("")
   const vote = useMutation({
     mutationFn: () => voteReview({ data: { reviewId: review.id } }),
     onSuccess: (r) => {
       if (!r.ok) toast.error(r.error.message)
+      onChanged()
+    },
+  })
+  const report = useMutation({
+    mutationFn: () => reportReview({ data: { reviewId: review.id, reason: reason.trim() } }),
+    onSuccess: (r) => {
+      if (!r.ok) {
+        toast.error(r.error.message)
+        return
+      }
+      toast.success("Thanks — a moderator will take a look")
+      setReporting(false)
+      setReason("")
+    },
+  })
+  const addPhoto = useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData()
+      fd.append("reviewId", review.id)
+      fd.append("file", file)
+      return uploadReviewPhoto({ data: fd })
+    },
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else toast.success("Photo added")
       onChanged()
     },
   })
@@ -262,21 +302,83 @@ function ReviewRow({ review, onChanged }: { review: ReviewRowData; onChanged: ()
         </span>
       </div>
       <p className="mt-2 text-sm leading-relaxed">{review.body}</p>
+      {review.photos.length > 0 && (
+        <div className="mt-3 flex gap-2">
+          {review.photos.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer">
+              <img
+                src={url}
+                alt="Review photo"
+                loading="lazy"
+                className="size-16 rounded-md border object-cover"
+              />
+            </a>
+          ))}
+        </div>
+      )}
       {review.sellerReply && (
         <div className="bg-muted mt-3 rounded-lg p-3 text-sm">
           <p className="mb-1 text-xs font-medium">Seller response</p>
           <p className="whitespace-pre-line">{review.sellerReply}</p>
         </div>
       )}
-      <div className="mt-3">
-        <Button
-          variant={review.myVote ? "secondary" : "ghost"}
-          size="xs"
-          onClick={() => vote.mutate()}
-        >
-          <ThumbsUp className="size-3" /> Helpful ({review.helpfulCount})
-        </Button>
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        {!review.mine && (
+          <Button
+            variant={review.myVote ? "secondary" : "ghost"}
+            size="xs"
+            onClick={() => vote.mutate()}
+          >
+            <ThumbsUp className="size-3" /> Helpful ({review.helpfulCount})
+          </Button>
+        )}
+        {review.mine && review.photos.length < MAX_REVIEW_PHOTOS && (
+          <label className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1 px-2 text-xs">
+            <ImagePlus className="size-3" />
+            {addPhoto.isPending ? "Uploading…" : "Add photo"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              disabled={addPhoto.isPending}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) addPhoto.mutate(f)
+                e.target.value = ""
+              }}
+            />
+          </label>
+        )}
+        {review.canReport && (
+          <Button variant="ghost" size="xs" onClick={() => setReporting(true)}>
+            <Flag className="size-3" /> Report
+          </Button>
+        )}
       </div>
+      <Dialog open={reporting} onOpenChange={setReporting}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report this review</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            placeholder="What's wrong with it? (5–300 characters)"
+            value={reason}
+            maxLength={300}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReporting(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={reason.trim().length < 5 || report.isPending}
+              onClick={() => report.mutate()}
+            >
+              Send report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

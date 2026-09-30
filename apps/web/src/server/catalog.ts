@@ -16,9 +16,13 @@ import {
   sql,
 } from "@ecommerce/db"
 import { cachedJson, invalidateCache } from "@ecommerce/redis"
-import { parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
+import { getEnv, parsePriceToCents, slugify, slugWithSuffix } from "@ecommerce/config"
 import { AppError, guard, requireRole, requireUser } from "./session"
 import { validateAttributeValue } from "./attributes"
+import { recomputeProductAggregates } from "./internals"
+import { csvCell } from "@/lib/csv"
+import { toPage } from "@/lib/pagination"
+import { copyProductImage, deleteObject } from "@ecommerce/storage"
 
 /** Escape LIKE/ILIKE wildcards so user input can't inject patterns. */
 function escapeLike(input: string): string {
@@ -277,7 +281,7 @@ export const listProducts = createServerFn({ method: "GET" })
       min: typeof f.min === "number" ? f.min : undefined,
       max: typeof f.max === "number" ? f.max : undefined,
       sort: f.sort ?? "newest",
-      page: Math.max(1, f.page ?? 1),
+      page: toPage(f.page),
       minRating: typeof f.minRating === "number" ? f.minRating : undefined,
       variantSku: f.variantSku?.slice(0, 40),
       attributes:
@@ -341,12 +345,13 @@ export const listProducts = createServerFn({ method: "GET" })
       if (data.attributes) {
         for (const [attrSlug, values] of Object.entries(data.attributes)) {
           if (values.length === 0) continue
-          const [def] = await db
-            .select({ id: schema.attributeDefinitions.id, kind: schema.attributeDefinitions.kind })
+          // a slug is unique per product type, not globally (M12): the facet
+          // matches that attribute in every type that defines it
+          const defs = await db
+            .select({ id: schema.attributeDefinitions.id })
             .from(schema.attributeDefinitions)
             .where(eq(schema.attributeDefinitions.slug, attrSlug))
-            .limit(1)
-          if (!def) continue
+          if (defs.length === 0) continue
           // jsonb containment works for every kind: scalar strings, numbers,
           // booleans, and arrays containing the element
           const valuePreds = values.map(
@@ -358,7 +363,7 @@ export const listProducts = createServerFn({ method: "GET" })
               SELECT 1 FROM product_attribute_values pav
               JOIN attribute_definitions ad ON ad.id = pav.attribute_id
               WHERE pav.product_id = ${schema.products.id}
-                AND ad.id = ${def.id}
+                AND ${inArray(sql`ad.id`, defs.map((d) => d.id))}
                 AND ${anyValue}
             )`
           )
@@ -593,22 +598,20 @@ export const listSellerProducts = createServerFn({ method: "GET" })
   .validator((input: unknown) => {
     const f = (input ?? {}) as { page?: number; pageSize?: number; q?: string }
     return {
-      page: Math.max(1, f.page ?? 1),
-      pageSize: Math.min(50, Math.max(5, f.pageSize ?? 10)),
+      page: toPage(f.page),
+      pageSize: Math.min(50, Math.max(5, Number(f.pageSize) || 10)),
       q: f.q?.slice(0, 100),
     }
   })
   .handler(({ data }) =>
     guard(async () => {
       const user = await requireRole("seller", "super_admin")
-      const [shop] = await db
-        .select()
-        .from(schema.shops)
-        .where(eq(schema.shops.ownerId, user.id))
-        .limit(1)
+      const shop = await myShop(user.id) // M15: no shop → clear error, not a 500
 
       const conditions = [eq(schema.products.shopId, shop.id)]
-      if (data.q) conditions.push(ilike(schema.products.title, `%${data.q}%`))
+      if (data.q) {
+        conditions.push(ilike(schema.products.title, `%${escapeLike(data.q)}%`))
+      }
       const where = and(...conditions)
 
       const rows = await db
@@ -809,6 +812,7 @@ export const createProduct = createServerFn({ method: "POST" })
               seoDescription: data.seoDescription,
               lowStockThreshold: data.lowStockThreshold,
               priceCents: data.priceCents,
+              currency: getEnv().CURRENCY,
               stock: data.stock,
               status: data.status,
             })
@@ -911,6 +915,13 @@ export const updateProduct = createServerFn({ method: "POST" })
       }
 
       return db.transaction(async (tx) => {
+        // Variant products derive price/stock from their variants (plan-5);
+        // writing the form values would desync the storefront price from
+        // the price actually charged (M5).
+        const variantCount = await tx.$count(
+          schema.productVariants,
+          eq(schema.productVariants.productId, data.id)
+        )
         const [product] = await tx
           .update(schema.products)
           .set({
@@ -926,12 +937,14 @@ export const updateProduct = createServerFn({ method: "POST" })
             seoTitle: data.seoTitle,
             seoDescription: data.seoDescription,
             lowStockThreshold: data.lowStockThreshold,
-            priceCents: data.priceCents,
-            stock: data.stock,
+            ...(variantCount === 0
+              ? { priceCents: data.priceCents, stock: data.stock }
+              : {}),
             status: data.status,
           })
           .where(eq(schema.products.id, data.id))
           .returning()
+        if (variantCount > 0) await recomputeProductAggregates(tx, data.id)
         await tx
           .delete(schema.productTags)
           .where(eq(schema.productTags.productId, data.id))
@@ -995,7 +1008,7 @@ export const adminListProducts = createServerFn({ method: "GET" })
       status: ["draft", "active", "archived"].includes(rawStatus)
         ? (rawStatus as "draft" | "active" | "archived")
         : undefined,
-      page: Math.max(1, f.page ?? 1),
+      page: toPage(f.page),
     }
   })
   .handler(({ data }) =>
@@ -1204,6 +1217,7 @@ export const duplicateProduct = createServerFn({ method: "POST" })
         .limit(1)
       if (taken) slug = slugWithSuffix(slug)
 
+      const copiedKeys: string[] = []
       const copy = await db.transaction(async (tx) => {
         const [product] = await tx
           .insert(schema.products)
@@ -1247,7 +1261,9 @@ export const duplicateProduct = createServerFn({ method: "POST" })
             srcAttrs.map((a) => ({ productId: product.id, attributeId: a.attributeId, value: a.value })),
           )
         }
-        // images: rows reference the same S3 objects (no object copy needed)
+        // images: copy each S3 object to the new product's own key (M11 —
+        // product_images.key is unique, and a shared object would vanish from
+        // the original when deleted on the copy)
         const srcImages = await tx
           .select()
           .from(schema.productImages)
@@ -1255,12 +1271,14 @@ export const duplicateProduct = createServerFn({ method: "POST" })
           .orderBy(asc(schema.productImages.sortOrder))
         const imageIdMap = new Map<string, string>()
         for (const img of srcImages) {
+          const copied = await copyProductImage(img.key, src.shopId, product.id)
+          copiedKeys.push(copied.key)
           const [newImage] = await tx
             .insert(schema.productImages)
             .values({
               productId: product.id,
-              key: img.key,
-              url: img.url,
+              key: copied.key,
+              url: copied.url,
               alt: img.alt,
               sortOrder: img.sortOrder,
             })
@@ -1273,12 +1291,14 @@ export const duplicateProduct = createServerFn({ method: "POST" })
           .from(schema.productVariants)
           .where(eq(schema.productVariants.productId, src.id))
           .orderBy(asc(schema.productVariants.position))
-        for (const [i, v] of srcVariants.entries()) {
+        for (const v of srcVariants) {
           const [newVariant] = await tx
             .insert(schema.productVariants)
             .values({
               productId: product.id,
-              sku: `${v.sku}-C${i + 1}`,
+              // random suffix: duplicating the same product twice must not
+              // collide on the unique SKU
+              sku: `${v.sku.slice(0, 30)}-C${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
               title: v.title,
               priceCents: v.priceCents,
               stock: v.stock,
@@ -1304,6 +1324,10 @@ export const duplicateProduct = createServerFn({ method: "POST" })
           }
         }
         return { id: product.id, slug: product.slug }
+      }).catch(async (err) => {
+        // roll back the object copies too
+        await Promise.allSettled(copiedKeys.map((k) => deleteObject(k)))
+        throw err
       })
       return copy
     }),
@@ -1369,6 +1393,7 @@ export const exportProductsCsv = createServerFn({ method: "GET" }).handler(
             : sql`false`
       const rows = await db
         .select({
+          id: schema.products.id,
           kind: sql<string>`'product'`,
           title: schema.products.title,
           slug: schema.products.slug,
@@ -1383,8 +1408,10 @@ export const exportProductsCsv = createServerFn({ method: "GET" }).handler(
         .from(schema.products)
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
         .where(where)
+        .orderBy(asc(schema.products.createdAt))
       const variantRows = await db
         .select({
+          id: schema.productVariants.productId,
           kind: sql<string>`'variant'`,
           title: schema.products.title,
           slug: schema.products.slug,
@@ -1400,17 +1427,23 @@ export const exportProductsCsv = createServerFn({ method: "GET" }).handler(
         .innerJoin(schema.products, eq(schema.productVariants.productId, schema.products.id))
         .innerJoin(schema.shops, eq(schema.products.shopId, schema.shops.id))
         .where(where)
-      const all = [...rows, ...variantRows]
+        .orderBy(asc(schema.productVariants.position))
+      // each product row is followed by ITS variant rows — the import attaches
+      // variant rows to the preceding product (M3: all variants used to come
+      // after all products, so a re-import put them on the last product)
+      const variantsByProduct = new Map<string, typeof variantRows>()
+      for (const v of variantRows) {
+        const list = variantsByProduct.get(v.id) ?? []
+        list.push(v)
+        variantsByProduct.set(v.id, list)
+      }
+      const all = rows.flatMap((p) => [p, ...(variantsByProduct.get(p.id) ?? [])])
       const header =
         "row_kind,title,slug,brand,condition,price_cents,stock,status,variant_title,variant_sku"
-      const esc = (v: unknown) => {
-        const str = v === null || v === undefined ? "" : String(v)
-        return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
-      }
       const body = all
         .map((r) =>
           [r.kind, r.title, r.slug, r.brand, r.condition, r.priceCents, r.stock, r.status, r.variantTitle, r.variantSku]
-            .map(esc)
+            .map(csvCell)
             .join(","),
         )
         .join("\n")
