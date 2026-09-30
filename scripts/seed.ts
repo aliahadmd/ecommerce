@@ -4,6 +4,11 @@
  * categories/tags by slug; products by slug (images only on first create).
  *
  * Run: pnpm db:seed   (env loads from the repo root .env)
+ *
+ * Production (H7): demo users/shop/products/coupon are NEVER created. Run
+ *   pnpm db:seed -- --admin-only
+ * with SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD set explicitly; the dev
+ * default password is refused.
  */
 import path from "node:path";
 import dotenv from "dotenv";
@@ -41,8 +46,31 @@ async function main() {
     return user;
   }
 
+  const adminOnly = process.argv.includes("--admin-only");
+  if (env.NODE_ENV === "production") {
+    if (!adminOnly) {
+      throw new Error(
+        "Refusing to seed demo data in production. Use `pnpm db:seed -- --admin-only` to create the super admin only.",
+      );
+    }
+    if (
+      !process.env.SUPER_ADMIN_EMAIL ||
+      !process.env.SUPER_ADMIN_PASSWORD ||
+      env.SUPER_ADMIN_PASSWORD === "Admin1234!" ||
+      env.SUPER_ADMIN_PASSWORD.length < 12
+    ) {
+      throw new Error(
+        "Set SUPER_ADMIN_EMAIL and a strong SUPER_ADMIN_PASSWORD (12+ chars, not the dev default) to bootstrap production.",
+      );
+    }
+  }
+
   const admin = await ensureUser("Super Admin", env.SUPER_ADMIN_EMAIL, env.SUPER_ADMIN_PASSWORD);
   await db.update(schema.users).set({ role: "super_admin" }).where(eq(schema.users.id, admin.id));
+  if (adminOnly) {
+    console.log(`Super admin ready: ${env.SUPER_ADMIN_EMAIL}`);
+    process.exit(0);
+  }
 
   const seller = await ensureUser("Ada Seller", "seller@dev.local", "Seller1234!");
   const buyer = await ensureUser("Bob Buyer", "buyer@dev.local", "Buyer1234!");

@@ -62,10 +62,19 @@ export function getNotifyQueue(): Queue<NotifyJobData> {
   return notifyQueue
 }
 
+/**
+ * BullMQ rejects custom job ids containing ":" ("Custom Id cannot contain :"),
+ * which every dedupe key did — so every enqueue failed and no transactional
+ * email or notification was ever delivered. Map keys to a safe id.
+ */
+export function toJobId(dedupeKey: string): string {
+  return dedupeKey.replace(/:/g, "|")
+}
+
 /** Fire-and-forget email enqueue. Never throws (jobs must not break flows). */
 export async function enqueueEmail(job: EmailJobData): Promise<void> {
   try {
-    await getEmailQueue().add(job.template, job, { jobId: job.dedupeKey })
+    await getEmailQueue().add(job.template, job, { jobId: toJobId(job.dedupeKey) })
   } catch (err) {
     console.error("[jobs] email enqueue failed:", err)
   }
@@ -73,7 +82,7 @@ export async function enqueueEmail(job: EmailJobData): Promise<void> {
 
 export async function enqueueNotification(job: NotifyJobData): Promise<void> {
   try {
-    await getNotifyQueue().add("notify", job, { jobId: job.dedupeKey })
+    await getNotifyQueue().add("notify", job, { jobId: toJobId(job.dedupeKey) })
   } catch (err) {
     console.error("[jobs] notify enqueue failed:", err)
   }

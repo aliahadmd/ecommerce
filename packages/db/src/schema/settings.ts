@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  uniqueIndex,
   jsonb,
   pgEnum,
   pgTable,
@@ -10,6 +11,9 @@ import {
 } from "drizzle-orm/pg-core"
 import { subOrders } from "./sub-orders"
 import { shops } from "./shops"
+
+/** Key of the admin store-settings record (mode, signups, commission, contact). */
+export const STORE_SETTINGS_KEY = "store.settings"
 
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
@@ -47,7 +51,13 @@ export const sellerLedger = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("seller_ledger_shop_idx").on(t.shopId, t.createdAt)]
+  (t) => [
+    index("seller_ledger_shop_idx").on(t.shopId, t.createdAt),
+    // one sale (or refund) row per sub-order — the DB backstop for the
+    // concurrent "mark delivered" race (plan 005). NULL sub_order_id payout
+    // rows never conflict (NULLs are distinct).
+    uniqueIndex("seller_ledger_sub_kind_uq").on(t.subOrderId, t.kind),
+  ]
 )
 
 export const payouts = pgTable(

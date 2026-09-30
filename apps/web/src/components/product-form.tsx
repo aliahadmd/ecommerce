@@ -216,29 +216,35 @@ export function ProductForm({
         )}
       </form.Field>
 
-      <form.Field
-        name="price"
-        validators={{ onChange: productFormSchema.shape.price }}
-      >
-        {(field) => (
-          <div className="space-y-1.5">
-            <Label htmlFor="price">Price (USD)</Label>
-            <Input
-              id="price"
-              inputMode="decimal"
-              placeholder="12.34"
-              value={field.state.value}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
-            {field.state.meta.errors.length > 0 && (
-              <p className="text-xs text-destructive">
-                {errMsg(field.state.meta.errors[0])}
-              </p>
-            )}
-          </div>
-        )}
-      </form.Field>
+      {hidePriceStock ? (
+        <p className="text-muted-foreground text-sm">
+          Price and stock are managed per variant below.
+        </p>
+      ) : (
+        <form.Field
+          name="price"
+          validators={{ onChange: productFormSchema.shape.price }}
+        >
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="price">Price</Label>
+              <Input
+                id="price"
+                inputMode="decimal"
+                placeholder="12.34"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+              {field.state.meta.errors.length > 0 && (
+                <p className="text-xs text-destructive">
+                  {errMsg(field.state.meta.errors[0])}
+                </p>
+              )}
+            </div>
+          )}
+        </form.Field>
+      )}
 
       {!hidePriceStock && (
         <form.Field name="stock" validators={{ onChange: stockSchema }}>

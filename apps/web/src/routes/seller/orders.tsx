@@ -4,7 +4,10 @@ import { useState } from "react"
 import { formatMoney } from "@ecommerce/config"
 import { getSubOrderDetail, listShopSubOrders } from "@/server/sub-orders"
 import { unwrap } from "@/lib/unwrap"
+import { Pager } from "@/components/pager"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { SubOrderActions } from "@/components/sub-order-actions"
+import type { PaymentState } from "@/lib/order-status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,8 +28,8 @@ import {
 export const Route = createFileRoute("/seller/orders")({
   loader: async ({ context: { queryClient } }) => {
     await queryClient.ensureQueryData({
-      queryKey: ["shop-sub-orders"],
-      queryFn: () => listShopSubOrders().then(unwrap),
+      queryKey: ["shop-sub-orders", 1],
+      queryFn: () => listShopSubOrders({ data: { page: 1 } }).then(unwrap),
     })
   },
   component: SellerSubOrdersPage,
@@ -41,6 +44,7 @@ const statusVariant = (s: string) =>
 
 interface SubOrderRow {
   id: string
+  orderId: string
   orderNumber: string
   status: Status
   totalCents: number
@@ -48,15 +52,18 @@ interface SubOrderRow {
   buyerName: string
   createdAt: string | Date
   itemCount: number
+  paymentMethod: "cod" | "card" | null
+  paymentState: PaymentState | null
 }
 
 type Status = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
 
 function SellerSubOrdersPage() {
   const queryClient = useQueryClient()
+  const [page, setPage] = useState(1)
   const { data: orders } = useQuery({
-    queryKey: ["shop-sub-orders"],
-    queryFn: () => listShopSubOrders().then(unwrap),
+    queryKey: ["shop-sub-orders", page],
+    queryFn: () => listShopSubOrders({ data: { page } }).then(unwrap),
   })
 
   function refresh() {
@@ -92,6 +99,7 @@ function SellerSubOrdersPage() {
           </TableBody>
         </Table>
       </div>
+      <Pager page={page} onPage={setPage} count={orders?.length ?? 0} pageSize={LIST_PAGE_SIZE} />
     </div>
   )
 }
@@ -129,7 +137,18 @@ function SellerSubOrderRow({
         {formatMoney(row.totalCents, row.currency)}
       </TableCell>
       <TableCell className="text-right">
-        <SubOrderActions subOrderId={row.id} status={row.status} role="seller" onChanged={onChanged} />
+        <SubOrderActions
+          subOrderId={row.id}
+          status={row.status}
+          role="seller"
+          onChanged={onChanged}
+          orderId={row.orderId}
+          payment={
+            row.paymentMethod && row.paymentState
+              ? { method: row.paymentMethod, state: row.paymentState }
+              : null
+          }
+        />
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-h-[80vh] overflow-y-auto">
             <DialogHeader>

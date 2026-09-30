@@ -10,6 +10,8 @@ import {
   getAdminStats,
 } from "@/server/admin"
 import { unwrap } from "@/lib/unwrap"
+import { Pager } from "@/components/pager"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import type { Role } from "@/server/session"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -91,9 +93,10 @@ function AdminDashboard() {
     queryKey: ["admin-stats"],
     queryFn: () => getAdminStats().then(unwrap),
   })
+  const [usersPage, setUsersPage] = useState(1)
   const { data: users, refetch } = useQuery({
-    queryKey: ["admin-users"],
-    queryFn: () => adminListUsers().then(unwrap),
+    queryKey: ["admin-users", usersPage],
+    queryFn: () => adminListUsers({ data: { page: usersPage } }).then(unwrap),
   })
   const [banning, setBanning] = useState<{ id: string; name: string } | null>(
     null
@@ -255,6 +258,7 @@ function AdminDashboard() {
               ))}
             </TableBody>
           </Table>
+          <Pager page={usersPage} onPage={setUsersPage} count={users?.length ?? 0} pageSize={LIST_PAGE_SIZE} />
         </CardContent>
       </Card>
 

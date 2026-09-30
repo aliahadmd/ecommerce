@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { adminListReviews, setReviewStatus } from "@/server/reviews"
+import { adminListReviews, deleteReview, setReviewStatus } from "@/server/reviews"
+import { dismissReviewReport, listReportedReviews } from "@/server/settings"
 import { unwrap } from "@/lib/unwrap"
 import { toast } from "sonner"
 
@@ -33,12 +34,70 @@ function AdminReviewsPage() {
       if (!r.ok) toast.error(r.error.message)
       else toast.success("Review updated")
       void queryClient.invalidateQueries({ queryKey: ["admin-reviews"] })
+      void queryClient.invalidateQueries({ queryKey: ["admin-reported-reviews"] })
+      void queryClient.invalidateQueries({ queryKey: ["product"] })
+    },
+  })
+  const { data: reported } = useQuery({
+    queryKey: ["admin-reported-reviews"],
+    queryFn: () => listReportedReviews().then(unwrap),
+  })
+  const dismiss = useMutation({
+    mutationFn: (reviewId: string) => dismissReviewReport({ data: { reviewId } }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else toast.success("Report dismissed")
+      void queryClient.invalidateQueries({ queryKey: ["admin-reported-reviews"] })
+    },
+  })
+  // "Delete" used to only hide the review; it now really deletes
+  const remove = useMutation({
+    mutationFn: (reviewId: string) => deleteReview({ data: { reviewId } }),
+    onSuccess: (r) => {
+      if (!r.ok) toast.error(r.error.message)
+      else toast.success("Review deleted")
+      void queryClient.invalidateQueries({ queryKey: ["admin-reviews"] })
+      void queryClient.invalidateQueries({ queryKey: ["admin-reported-reviews"] })
       void queryClient.invalidateQueries({ queryKey: ["product"] })
     },
   })
 
   return (
     <div>
+      {reported && reported.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-base font-semibold">
+            Reported reviews ({reported.length})
+          </h2>
+          <div className="space-y-2">
+            {reported.map((r) => (
+              <div key={r.reviewId} className="rounded-xl border p-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <StarRating value={r.rating} className="size-3" />
+                  <span className="font-medium">{r.title}</span>
+                  <Badge variant="destructive">{r.reports} report(s)</Badge>
+                  <div className="ml-auto flex gap-1.5">
+                    <Button variant="outline" size="xs" onClick={() => dismiss.mutate(r.reviewId)}>
+                      Dismiss
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => {
+                        setStatus.mutate({ reviewId: r.reviewId, status: "hidden" })
+                        dismiss.mutate(r.reviewId)
+                      }}
+                    >
+                      Hide
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-muted-foreground mt-1 line-clamp-2">{r.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <h1 className="mb-4 text-lg font-semibold">
         Review moderation {data ? `(${data.total})` : ""}
       </h1>
@@ -93,7 +152,9 @@ function AdminReviewsPage() {
                   <Button
                     variant="ghost"
                     size="xs"
-                    onClick={() => setStatus.mutate({ reviewId: r.id, status: "hidden" })}
+                    onClick={() => {
+                      if (window.confirm("Delete this review permanently?")) remove.mutate(r.id)
+                    }}
                   >
                     Delete
                   </Button>

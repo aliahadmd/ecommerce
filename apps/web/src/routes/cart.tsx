@@ -191,7 +191,7 @@ function CartPage() {
             <span className="font-semibold">
               {formatMoney(
                 cart.subtotalCents,
-                cart.items[0]?.currency ?? "USD"
+                cart.currency
               )}
             </span>
           </div>
@@ -219,7 +219,7 @@ function CartPage() {
               </span>
               <span>
                 -
-                {formatMoney(applied.discountCents, cart.items[0]?.currency ?? "USD")}
+                {formatMoney(applied.discountCents, cart.currency)}
               </span>
             </div>
           )}

@@ -1,98 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
-import { db, schema, and, desc, eq, sql } from "@ecommerce/db"
-import { cachedJson } from "@ecommerce/redis"
+import { db, schema, desc, eq, sql } from "@ecommerce/db"
 import { AppError, guard, requireRole } from "./session"
-
-const DEFAULT_COMMISSION_PERCENT = 10
-
-/**
- * Read the commission percent from settings (cached 30s, default 10%).
- * The uncached twin used inside ledger transactions lives in payouts-internals.
- */
-export async function getCommissionPercent(): Promise<number> {
-  try {
-    return await cachedJson("settings:commission", 30, async () => {
-      const [row] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, "commerce.commission_rate"))
-        .limit(1)
-      const v = row?.value
-      return typeof v === "number" && v >= 0 && v <= 50 ? v : DEFAULT_COMMISSION_PERCENT
-    })
-  } catch {
-    return DEFAULT_COMMISSION_PERCENT
-  }
-}
-
-/**
- * Create the `sale` ledger entry for a delivered sub-order. Idempotent:
- * one sale entry per sub-order (checked in-tx).
- * `tx` must be the caller's transaction.
- */
-export async function ledgerSaleForSubOrder(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  subOrderId: string
-): Promise<void> {
-  const [existing] = await tx
-    .select({ id: schema.sellerLedger.id })
-    .from(schema.sellerLedger)
-    .where(
-      and(
-        eq(schema.sellerLedger.subOrderId, subOrderId),
-        eq(schema.sellerLedger.kind, "sale")
-      )
-    )
-    .limit(1)
-  if (existing) return
-
-  const [sub] = await tx
-    .select()
-    .from(schema.subOrders)
-    .where(eq(schema.subOrders.id, subOrderId))
-    .limit(1)
-  if (!sub) return
-
-  const percent = await getCommissionPercent()
-  const gross = sub.totalCents - sub.discountCents
-  const commission = Math.round((gross * percent) / 100)
-  await tx.insert(schema.sellerLedger).values({
-    shopId: sub.shopId,
-    subOrderId: sub.id,
-    orderId: sub.orderId,
-    kind: "sale",
-    grossCents: gross,
-    commissionCents: commission,
-    netCents: gross - commission,
-    memo: null,
-  })
-}
-
-/** Balancing refund entry (gross=refunded, net=-(refunded-commission)). */
-export async function ledgerRefundForSubOrder(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  subOrderId: string,
-  refundCents: number
-): Promise<void> {
-  const percent = await getCommissionPercent()
-  const commission = Math.round((refundCents * percent) / 100)
-  const [sub] = await tx
-    .select({ shopId: schema.subOrders.shopId, orderId: schema.subOrders.orderId })
-    .from(schema.subOrders)
-    .where(eq(schema.subOrders.id, subOrderId))
-    .limit(1)
-  if (!sub) return
-  await tx.insert(schema.sellerLedger).values({
-    shopId: sub.shopId,
-    subOrderId,
-    orderId: sub.orderId,
-    kind: "refund",
-    grossCents: refundCents,
-    commissionCents: commission,
-    netCents: -(refundCents - commission),
-    memo: "refund",
-  })
-}
 
 // ── seller reads ─────────────────────────────────────────────────────────────
 
@@ -188,6 +96,14 @@ export const createPayout = createServerFn({ method: "POST" })
     guard(async () => {
       const admin = await requireRole("super_admin")
       await db.transaction(async (tx) => {
+        // serialize payouts per shop: two concurrent payouts must not both
+        // read the pre-payout balance (plan 005)
+        const [shop] = await tx
+          .select({ id: schema.shops.id })
+          .from(schema.shops)
+          .where(eq(schema.shops.id, data.shopId))
+          .for("update")
+        if (!shop) throw new AppError("NOT_FOUND", "Shop not found")
         const [available] = await tx
           .select({
             net: sql<number>`coalesce(sum(net_cents),0)::int`,

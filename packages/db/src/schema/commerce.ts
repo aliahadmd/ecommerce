@@ -12,11 +12,14 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { products } from "./catalog";
 import { shops } from "./shops";
 import { productVariants } from "./variants";
+import { coupons } from "./coupons";
+import { subOrders } from "./sub-orders";
 
 export const orderStatus = pgEnum("order_status", [
   "pending",
@@ -36,7 +39,9 @@ export const carts = pgTable("carts", {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
-  couponId: uuid("coupon_id"),
+  couponId: uuid("coupon_id").references((): AnyPgColumn => coupons.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
@@ -145,7 +150,9 @@ export const orderItems = pgTable(
     variantId: uuid("variant_id").references(() => productVariants.id, {
       onDelete: "set null",
     }),
-    subOrderId: uuid("sub_order_id"),
+    subOrderId: uuid("sub_order_id").references((): AnyPgColumn => subOrders.id, {
+      onDelete: "cascade",
+    }),
     shopId: uuid("shop_id")
       .notNull()
       .references(() => shops.id, { onDelete: "restrict" }),

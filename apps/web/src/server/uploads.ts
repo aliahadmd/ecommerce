@@ -7,6 +7,7 @@ import {
   isAllowedImageMime,
   MAX_IMAGE_BYTES,
   publicUrl,
+  sniffImageMime,
   uploadImage,
 } from "@ecommerce/storage"
 import { AppError, guard, requireRole } from "./session"
@@ -77,8 +78,13 @@ export const uploadProductImage = createServerFn({ method: "POST" })
         )
       }
 
-      const key = buildImageKey(target.shopId, productId, file.type)
-      await uploadImage(key, new Uint8Array(await file.arrayBuffer()), file.type)
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const mime = sniffImageMime(bytes)
+      if (!mime) {
+        throw new AppError("INVALID", "Only JPEG, PNG or WebP images are allowed")
+      }
+      const key = buildImageKey(target.shopId, productId, mime)
+      await uploadImage(key, bytes, mime)
       const [image] = await db
         .insert(schema.productImages)
         .values({
@@ -148,6 +154,10 @@ export const setPrimaryImage = createServerFn({ method: "POST" })
         .select({ id: schema.productImages.id })
         .from(schema.productImages)
         .where(eq(schema.productImages.productId, data.productId))
+      // L3: the chosen image must belong to this product
+      if (!images.some((i) => i.id === data.imageId)) {
+        throw new AppError("NOT_FOUND", "Image not found on this product")
+      }
       const ordered = [
         data.imageId,
         ...images.map((i) => i.id).filter((id) => id !== data.imageId),

@@ -50,6 +50,11 @@ const envSchema = z.object({
   // Payments
   PAYMENT_PROVIDER: z.enum(["fake", "stripe"]).default("fake"),
   STRIPE_SECRET_KEY: z.string().default(""),
+  STRIPE_WEBHOOK_SECRET: z.string().default(""),
+  /** HMAC key for fake-gateway callbacks; derived from BETTER_AUTH_SECRET when empty */
+  PAYMENT_CALLBACK_SECRET: z.string().default(""),
+  /** unpaid card orders are cancelled (stock released) after this long */
+  CARD_PAYMENT_TTL_MINUTES: z.coerce.number().int().min(5).default(30),
 
   // Commerce
   CURRENCY: z.string().length(3).default("USD"),

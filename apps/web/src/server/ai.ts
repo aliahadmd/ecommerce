@@ -82,6 +82,9 @@ export const suggestTags = createServerFn({ method: "POST" })
       const allowed = await rateLimit("ai-tags", user.id, 20, 3600)
       if (!allowed)
         throw new AppError("RATE_LIMITED", "AI limit reached — try again later")
+      // L8: tag suggestions spend the same global daily budget
+      const daily = await rateLimit("ai-daily", "global", getEnv().AI_DAILY_LIMIT, 86400)
+      if (!daily) throw new AppError("RATE_LIMITED", "AI daily budget reached")
       const existing = await db
         .select({ name: schema.tags.name })
         .from(schema.tags)

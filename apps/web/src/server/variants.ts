@@ -155,8 +155,17 @@ export const generateVariants = createServerFn({ method: "POST" })
           eq(schema.variantOptionValues.variantId, schema.productVariants.id),
         )
         .where(eq(schema.productVariants.productId, data.productId))
+      // one combination key per existing variant (M2: joining every value
+      // into a single string made the Set hold characters, so nothing ever
+      // matched and re-running generate duplicated variants)
+      const optionsByVariant = new Map<string, string[]>()
+      for (const v of existingValues) {
+        const list = optionsByVariant.get(v.variantId) ?? []
+        list.push(`${v.attributeId}:${v.value}`)
+        optionsByVariant.set(v.variantId, list)
+      }
       const combos = new Set(
-        existingValues.map((v) => `${v.attributeId}:${v.value}`).sort().join("|"),
+        [...optionsByVariant.values()].map((opts) => opts.sort().join("|")),
       )
 
       // cartesian product over axes (in attribute order)
@@ -414,6 +423,22 @@ export const setDefaultVariant = createServerFn({ method: "POST" })
       const user = await requireRole("seller", "super_admin")
       const product = await productWithOwner(data.productId)
       assertCanManage(user, product.ownerId)
+      // L4: choosing a default no longer silently re-activates an archived
+      // variant — its status stays the seller's decision
+      const [target] = await db
+        .select({ status: schema.productVariants.status })
+        .from(schema.productVariants)
+        .where(
+          and(
+            eq(schema.productVariants.id, data.variantId),
+            eq(schema.productVariants.productId, data.productId),
+          ),
+        )
+        .limit(1)
+      if (!target) throw new AppError("NOT_FOUND", "Variant not found")
+      if (target.status === "archived") {
+        throw new AppError("INVALID", "Restore this variant before making it the default")
+      }
       await db.transaction(async (tx) => {
         await tx
           .update(schema.productVariants)
@@ -421,13 +446,8 @@ export const setDefaultVariant = createServerFn({ method: "POST" })
           .where(eq(schema.productVariants.productId, data.productId))
         await tx
           .update(schema.productVariants)
-          .set({ isDefault: true, status: "active" })
-          .where(
-            and(
-              eq(schema.productVariants.id, data.variantId),
-              eq(schema.productVariants.productId, data.productId),
-            ),
-          )
+          .set({ isDefault: true })
+          .where(eq(schema.productVariants.id, data.variantId))
       })
       return { ok: true }
     }),
@@ -453,12 +473,18 @@ export const assignVariantImage = createServerFn({ method: "POST" })
         .limit(1)
       if (!variant) throw new AppError("NOT_FOUND", "Variant not found")
       assertCanManage(user, variant.ownerId)
+      // L3: only an image of the variant's own product
       const [image] = await db
         .select({ id: schema.productImages.id })
         .from(schema.productImages)
-        .where(eq(schema.productImages.id, data.imageId))
+        .where(
+          and(
+            eq(schema.productImages.id, data.imageId),
+            eq(schema.productImages.productId, variant.productId),
+          ),
+        )
         .limit(1)
-      if (!image) throw new AppError("NOT_FOUND", "Image not found")
+      if (!image) throw new AppError("NOT_FOUND", "Image not found on this product")
       await db
         .update(schema.productVariants)
         .set({ imageId: data.imageId })

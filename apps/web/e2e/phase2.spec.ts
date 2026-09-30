@@ -1,6 +1,5 @@
 import { test, expect  } from "@playwright/test"
-import type {Page} from "@playwright/test";
-import { getVerificationLink, slowFillLabel } from "./helpers"
+import { login, registerAndLogin, slowFillLabel } from "./helpers"
 
 /**
  * Phase-2 e2e smoke: runs against a dev server + seeded data.
@@ -9,35 +8,6 @@ import { getVerificationLink, slowFillLabel } from "./helpers"
  * Each scenario registers its own user (verified via Mailpit) so cart/order
  * state never bleeds between tests.
  */
-
-const unique = () => `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-
-async function registerAndLogin(
-  page: Page,
-  name: string,
-): Promise<string> {
-  const email = `${unique()}@e2e.local`
-  await page.goto("/register")
-  await page.waitForTimeout(4000)
-  await slowFillLabel(page, "Name", name)
-  await slowFillLabel(page, "Email", email)
-  await slowFillLabel(page, "Password", "Passw0rd123")
-  await page.getByRole("button", { name: "Create account" }).click()
-  await expect(page.getByText("Check your email")).toBeVisible({ timeout: 10_000 })
-  const link = await getVerificationLink(email)
-  await page.goto(link.replace("http://localhost:3000", ""))
-  await page.waitForTimeout(2500)
-  return email
-}
-
-async function login(page: Page, email: string, password: string) {
-  await page.goto("/login")
-  await page.waitForTimeout(3000)
-  await slowFillLabel(page, "Email", email)
-  await slowFillLabel(page, "Password", password)
-  await page.getByRole("button", { name: "Sign in" }).click()
-  await page.waitForTimeout(2000)
-}
 
 test("register → verify → logged in", async ({ page }) => {
   const email = await registerAndLogin(page, "E2E Shopper")

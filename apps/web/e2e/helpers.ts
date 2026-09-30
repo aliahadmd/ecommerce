@@ -1,4 +1,4 @@
-import { request   } from "@playwright/test"
+import { expect, request } from "@playwright/test"
 import type {Page, Locator} from "@playwright/test";
 
 /**
@@ -35,4 +35,33 @@ export async function getVerificationLink(email: string): Promise<string> {
   if (!match) throw new Error("No verification link in email")
   // the HTML email escapes ampersands (&amp;) — unescape before navigating
   return match[0].replace(/&amp;/g, "&")
+}
+
+export const unique = () => `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+
+export async function registerAndLogin(
+  page: Page,
+  name: string,
+): Promise<string> {
+  const email = `${unique()}@e2e.local`
+  await page.goto("/register")
+  await page.waitForTimeout(4000)
+  await slowFillLabel(page, "Name", name)
+  await slowFillLabel(page, "Email", email)
+  await slowFillLabel(page, "Password", "Passw0rd123")
+  await page.getByRole("button", { name: "Create account" }).click()
+  await expect(page.getByText("Check your email")).toBeVisible({ timeout: 10_000 })
+  const link = await getVerificationLink(email)
+  await page.goto(link.replace("http://localhost:3000", ""))
+  await page.waitForTimeout(2500)
+  return email
+}
+
+export async function login(page: Page, email: string, password: string) {
+  await page.goto("/login")
+  await page.waitForTimeout(3000)
+  await slowFillLabel(page, "Email", email)
+  await slowFillLabel(page, "Password", password)
+  await page.getByRole("button", { name: "Sign in" }).click()
+  await page.waitForTimeout(2000)
 }

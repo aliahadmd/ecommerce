@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { formatMoney } from "@ecommerce/config"
 import { listAllOrders } from "@/server/commerce"
 import { unwrap } from "@/lib/unwrap"
+import { Pager } from "@/components/pager"
+import { LIST_PAGE_SIZE } from "@/lib/pagination"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -16,8 +19,8 @@ import {
 export const Route = createFileRoute("/admin/orders")({
   loader: async ({ context: { queryClient } }) => {
     await queryClient.ensureQueryData({
-      queryKey: ["admin-orders"],
-      queryFn: () => listAllOrders().then(unwrap),
+      queryKey: ["admin-orders", 1],
+      queryFn: () => listAllOrders({ data: { page: 1 } }).then(unwrap),
     })
   },
   component: AdminOrdersPage,
@@ -31,9 +34,10 @@ const statusVariant = (s: string) =>
       : "secondary"
 
 function AdminOrdersPage() {
+  const [page, setPage] = useState(1)
   const { data: orders } = useQuery({
-    queryKey: ["admin-orders"],
-    queryFn: () => listAllOrders().then(unwrap),
+    queryKey: ["admin-orders", page],
+    queryFn: () => listAllOrders({ data: { page } }).then(unwrap),
   })
 
   return (
@@ -92,6 +96,7 @@ function AdminOrdersPage() {
           </TableBody>
         </Table>
       </div>
+      <Pager page={page} onPage={setPage} count={orders?.length ?? 0} pageSize={LIST_PAGE_SIZE} />
     </div>
   )
 }

@@ -28,3 +28,7 @@ coverage/
 .turbo/
 .vite/
 drizzle/meta/_journal.json.bak
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/

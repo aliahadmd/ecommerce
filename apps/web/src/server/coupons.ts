@@ -22,20 +22,22 @@ export const applyCoupon = createServerFn({ method: "POST" })
   })
   .handler(({ data }) =>
     guard(async () => {
-      const { cartContext, findCouponByCode, validateUsable, computeDiscountCents } =
-        await import("./coupons-internals")
+      const {
+        cartContext,
+        couponBaseCents,
+        findCouponByCode,
+        validateUsable,
+        computeDiscountCents,
+      } = await import("./coupons-internals")
       const user = await requireUser()
       const ctx = await cartContext(user.id)
       if (!ctx || ctx.subtotal === 0) {
         throw new AppError("INVALID", "Add items to your cart first")
       }
       const coupon = await findCouponByCode(data.code)
-      await validateUsable(coupon, user.id, ctx.subtotal, ctx.shopIds)
-      const discountCents = computeDiscountCents(
-        coupon.kind,
-        coupon.value,
-        ctx.subtotal
-      )
+      const base = couponBaseCents(ctx.items, coupon.shopId)
+      await validateUsable(coupon, user.id, base, ctx.shopIds)
+      const discountCents = computeDiscountCents(coupon.kind, coupon.value, base)
       await db
         .update(schema.carts)
         .set({ couponId: coupon.id })
@@ -57,7 +59,7 @@ export const removeCoupon = createServerFn({ method: "POST" }).handler(() =>
 
 export const getAppliedCoupon = createServerFn({ method: "GET" }).handler(() =>
   guard(async () => {
-    const { cartContext, computeDiscountCents } = await import(
+    const { cartContext, couponBaseCents, computeDiscountCents } = await import(
       "./coupons-internals"
     )
     const user = await requireUser()
@@ -68,6 +70,7 @@ export const getAppliedCoupon = createServerFn({ method: "GET" }).handler(() =>
         code: schema.coupons.code,
         kind: schema.coupons.kind,
         value: schema.coupons.value,
+        shopId: schema.coupons.shopId,
       })
       .from(schema.coupons)
       .where(eq(schema.coupons.id, ctx.couponId))
@@ -75,7 +78,11 @@ export const getAppliedCoupon = createServerFn({ method: "GET" }).handler(() =>
     if (!coupon) return null
     return {
       code: coupon.code,
-      discountCents: computeDiscountCents(coupon.kind, coupon.value, ctx.subtotal),
+      discountCents: computeDiscountCents(
+        coupon.kind,
+        coupon.value,
+        couponBaseCents(ctx.items, coupon.shopId)
+      ),
     }
   })
 )
