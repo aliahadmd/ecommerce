@@ -91,8 +91,9 @@ services:
     volumes:
       - s3data:/data
     healthcheck:
-      # master up AND the S3 gateway listening
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9333/cluster/status && nc -z localhost 8333"]
+      # master up AND the S3 gateway listening (-ip=seaweedfs binds the
+      # service name, not localhost)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://seaweedfs:9333/cluster/status && nc -z seaweedfs 8333"]
       interval: 10s
       timeout: 5s
       retries: 30
