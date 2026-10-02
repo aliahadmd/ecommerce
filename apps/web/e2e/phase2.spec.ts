@@ -243,7 +243,14 @@ test("coupon: apply percent code → discount at checkout", async ({ page }) => 
   await page.getByRole("button", { name: /Add to cart/ }).click()
   await page.waitForTimeout(1500)
   await page.goto("/cart")
-  await page.getByPlaceholder("Coupon code").pressSequentially("E2E10", { delay: 10 })
+  // type only once the cart page is hydrated (hydration resets the field;
+  // CI runners are slow enough to hit that)
+  const code = page.getByPlaceholder("Coupon code")
+  await expect(async () => {
+    await code.fill("E2E10")
+    await page.waitForTimeout(300)
+    await expect(code).toHaveValue("E2E10")
+  }).toPass({ timeout: 20_000 })
   await page.getByRole("button", { name: "Apply" }).click()
   await expect(page.getByText(/Coupon E2E10 applied/).first()).toBeVisible({ timeout: 10_000 })
 })
