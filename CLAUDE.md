@@ -1,6 +1,6 @@
 # Working in this repo
 
-Multi-vendor marketplace — pnpm monorepo. `apps/web` (TanStack Start: SSR + server functions), `apps/worker` (BullMQ consumer), `packages/*` (config, db, auth, redis, storage, email, jobs, payments, ai). See README.md for setup.
+Multi-vendor marketplace — pnpm monorepo. `apps/web` (TanStack Start: SSR + server functions), `apps/worker` (BullMQ consumer), `packages/*` (config, db, auth, redis, storage, email, jobs, payments, ai). See docs/DEVELOPMENT.md for setup and deployment (README.md is the client-facing demo page).
 
 ## Commands
 

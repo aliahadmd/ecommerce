@@ -1,106 +1,129 @@
-# Ecommerce — multi-vendor marketplace
+# Multi-Vendor Marketplace — Live Demo
 
-AliExpress/Taobao-style marketplace: **super admin / seller / buyer** roles,
-catalog with variants, per-shop sub-orders, **cash-on-delivery and card**
-payments, coupons, seller ledger and payouts, background email/notification
-jobs. TanStack Start monorepo, infra in Docker, Dokploy-ready packaging.
+A complete online marketplace in the style of Amazon, AliExpress or Etsy:
+many independent shops sell on one storefront, shoppers buy from several shops
+in a single checkout, and the platform owner runs everything from an admin
+panel.
 
-## Quickstart (fresh machine, <10 min)
+### 👉 [Open the live demo: ecommerce.aliahad.com](https://ecommerce.aliahad.com)
 
-Prerequisites: Docker Desktop, Node ≥ 22 (nvm: `nvm use`), pnpm (`corepack enable` — the version comes from `packageManager` in `package.json`).
+![Storefront](docs/screenshots/01-storefront.png)
 
-```bash
-make env         # create .env from .env.example
-make install     # pnpm install
-make up          # start postgres+pgvector, redis, seaweedfs, mailpit
-make migrate     # apply DB migrations
-make seed        # seed demo data + super admin (idempotent, dev only)
-make dev         # start the app → http://localhost:3000
-make worker      # (second terminal) job worker: emails + in-app notifications
-```
+---
 
-Without `make worker`, order/status emails and notifications stay queued in
-Redis (sign-up verification and password-reset emails are sent directly).
+## Demo accounts
 
-Demo accounts (created by the seed — **development only**):
+Sign in with any of these accounts to see each side of the marketplace:
 
-| Role        | Email              | Password      |
-| ----------- | ------------------ | ------------- |
-| super admin | `admin@dev.local`  | `Admin1234!`  |
-| seller      | `seller@dev.local` | `Seller1234!` |
-| buyer       | `buyer@dev.local`  | `Buyer1234!`  |
+| Role | What you can do | Email | Password |
+| --- | --- | --- | --- |
+| **Shopper** | Browse, buy, pay, track and review orders | `buyer@dev.local` | `90c0866a5106` |
+| **Seller** | Manage a shop, products and incoming orders | `seller@dev.local` | `90c0866a5106` |
+| **Admin** | Run the whole marketplace | `admin@example.com` | `fa52532157b96a7fa696a875` |
 
-The dev compose file uses no host bind mounts (the only config, SeaweedFS's
-S3 keys, is inline; Postgres extensions come from the first migration), so it
-also works when the repo lives on a drive Docker Desktop can't share — e.g. an
-external disk that holds Docker's own data.
+You can also **register your own shopper account** in a few seconds — no email
+confirmation needed.
 
-## Services (dev)
+> This is a shared demo: other visitors use the same accounts, so you may see
+> their orders. Payments are simulated and no real emails are sent.
 
-| Service             | URL / port                       | Notes                                                    |
-| ------------------- | -------------------------------- | -------------------------------------------------------- |
-| Web app             | http://localhost:3000            | TanStack Start (SSR + server functions)                  |
-| Mailpit UI          | http://localhost:8025            | every dev email (verification, order mails) — SMTP :1025 |
-| SeaweedFS master UI | http://localhost:9333            | S3 API on :8333, filer UI on :8888                       |
-| Drizzle Studio      | `make studio`                    | database browser                                         |
-| Health              | http://localhost:3000/api/health | db/redis/storage checks                                  |
+---
 
-## What's implemented
+## A 5-minute tour
 
-- **Auth**: register → email verification → login; sessions; password reset; admin role/ban management (bans end sessions immediately).
-- **Catalog**: nested categories, tags, product types with typed attributes, variants (per-SKU price/stock/image), images on S3, reviews (verified purchase, photos, helpful votes, seller replies, abuse reports + moderation), wishlist, facets, CSV export/import (all-or-nothing, drafts).
-- **Orders**: cart → checkout splits into per-shop sub-orders; each seller fulfils their slice (confirm → ship → deliver); the order status is derived from its sub-orders; cancellation restores stock.
-- **Payments**: COD (seller records "Cash received" after delivery) or card via the provider abstraction — a local fake gateway in dev, Stripe Checkout + signed webhooks when configured. Unpaid card orders can be retried by the buyer and are auto-cancelled after `CARD_PAYMENT_TTL_MINUTES`; cancelling a paid card sub-order refunds it.
-- **Coupons**: percent / fixed / free shipping, cart-wide or shop-scoped (discounts only that shop), usage limits enforced in the checkout transaction.
-- **Money**: seller ledger (sale per delivered sub-order, commission from the admin setting), seller statements, admin payouts.
-- **Ops**: store settings (maintenance mode and sign-up switch are enforced server-side), BullMQ worker, AI description/tag suggestions via OpenRouter (optional — set `OPENROUTER_API_KEY`).
+### 1. As a shopper
 
-## Scripts & gates
+1. **Browse** the storefront, open a category and narrow results with the
+   filters (price, rating, material…).
+2. **Open a product** — pick a size or colour; price, stock and SKU update for
+   that option.
+3. **Add to cart**, open the cart and enter the coupon code **`E2E10`** for
+   10% off *(one use per account — register your own account to try it)*.
+4. **Check out**: add a delivery address and choose a payment method:
+   - **Cash on delivery** — the order is placed immediately.
+   - **Card** — you're taken to a simulated payment page. Click **Pay now**,
+     or **Simulate failure** and then **Retry payment** from the order page.
+5. **Track the order** under *My orders*: each shop's part of the order shows
+   its own status, and you can cancel it while it's still being prepared.
+6. After delivery, **leave a review** with a star rating and photos.
 
-`make dev/worker/build/lint/typecheck/test/migrate/seed/studio/up/down/reset/logs` —
-see the Makefile. Gates: `pnpm typecheck`, `pnpm lint`, `pnpm test` (Vitest:
-money, order state machine, order split/status rules, CSV), and the Playwright
-suite (`cd apps/web && npx playwright test`, needs `make up`, `make seed`,
-`make dev` and `make worker`).
+| Find products | Choose options |
+| --- | --- |
+| ![Catalog with filters](docs/screenshots/02-catalog.png) | ![Product page](docs/screenshots/03-product.png) |
 
-## Deploying (single demo server + Cloudflare Tunnel)
+| Cart with coupon | Checkout |
+| --- | --- |
+| ![Cart](docs/screenshots/04-cart.png) | ![Checkout](docs/screenshots/05-checkout.png) |
 
-Same pattern as the other projects on the server: everything runs in Docker
-(`docker-compose.prod.yml`, Compose project `ecommerce-prod`); the **only
-published port is the Caddy proxy on `127.0.0.1:$PROXY_PORT`** (loopback —
-never `0.0.0.0`; Docker bypasses host firewalls). Caddy routes `/storage/*`
-(read-only) to SeaweedFS for product images and everything else to the web
-app. postgres, redis, seaweedfs, mailpit (internal mail sink), web and worker
-stay on the project's private network. A host `cloudflared` tunnel routes a
-public hostname to the port.
+![Order tracking](docs/screenshots/06-order.png)
 
-```bash
-# one-time on the server
-git clone https://github.com/aliahadmd/ecommerce.git /opt/apps/ecommerce
-echo "30002 ecommerce" >> /opt/apps/PORTS          # next free loopback port
-/opt/apps/ecommerce/deploy/deploy.sh               # generates .env, builds, migrates, seeds, starts
-( crontab -l; echo '* * * * * /opt/apps/ecommerce/deploy/deploy.sh >> /var/log/ecommerce-deploy.log 2>&1' ) | crontab -
-# Cloudflare dashboard → tunnel → public hostname → http://localhost:30002
-# then set PUBLIC_URL=https://<hostname> in /opt/apps/ecommerce/.env and run deploy.sh --force
-```
+### 2. As a seller
 
-**Continuous deployment is pull-based:** cron runs `deploy/deploy.sh` every
-minute; it redeploys only when `origin/main` moved (`git reset --hard` +
-`docker compose up -d --build`, which runs the one-shot `migrate` service —
-migrations + idempotent seed — before web/worker start). A failing commit is
-skipped until a new push (or `--force`). No SSH keys in GitHub, no inbound
-access. Server secrets live in the generated, git-ignored `.env` (`chmod 600`);
-deploys never rewrite it.
+1. **Dashboard** — sales, orders waiting for action, and an orders-per-day chart.
+2. **Orders** — move each order along: **Confirm → Ship → Mark delivered**. For
+   cash-on-delivery orders, record the payment with **Cash received**.
+3. **Products** — create and edit products, upload images, add variants
+   (sizes, colours) with their own price and stock, duplicate products, and
+   import or export the catalog as CSV.
+4. **Payouts** — see earnings after the marketplace commission and payouts
+   received.
+5. **Reviews** — reply to customer reviews.
 
-Demo-host settings (in that `.env`): demo data is seeded
-(`ALLOW_DEMO_SEED=true`), sign-up needs no email verification, card payments
-use the built-in fake gateway, and the super admin / demo user passwords are
-random — read them with `grep -E 'SUPER_ADMIN|DEMO_USER' /opt/apps/ecommerce/.env`.
-For a real deployment set `ALLOW_DEMO_SEED=false`,
-`AUTH_REQUIRE_EMAIL_VERIFICATION=true`, real SMTP and Stripe keys.
+| Seller dashboard | Incoming orders |
+| --- | --- |
+| ![Seller dashboard](docs/screenshots/07-seller-dashboard.png) | ![Seller orders](docs/screenshots/08-seller-orders.png) |
 
-## Plans
+![Seller products](docs/screenshots/09-seller-products.png)
 
-- Architecture and history: `plans/phase1` … `plans/phase3` (as-built records).
-- Audit backlog and resolutions: [`plans/README.md`](plans/README.md) and
-  [`plans/audit-2026-09-30.md`](plans/audit-2026-09-30.md).
+### 3. As the admin
+
+1. **Dashboard** — users, sellers, products, orders and revenue at a glance;
+   manage user roles and ban accounts.
+2. **Catalog & Types** — categories, tags, and product types with custom
+   attributes (e.g. "Material", "Size").
+3. **Coupons** — create discount codes: percent, fixed amount or free
+   shipping; marketplace-wide or for one shop; with usage limits and expiry.
+4. **Payouts** — see what each shop has earned and record payouts.
+5. **Reviews** — moderate reviews and handle reported ones.
+6. **Settings** — set the marketplace commission, open or close sign-ups, and
+   switch the store into maintenance mode.
+
+| Admin dashboard | Store settings |
+| --- | --- |
+| ![Admin dashboard](docs/screenshots/10-admin-dashboard.png) | ![Admin settings](docs/screenshots/11-admin-settings.png) |
+
+> Please don't switch on maintenance mode or ban the demo accounts — it would
+> lock other visitors out.
+
+---
+
+## Features at a glance
+
+- **Multi-vendor checkout** — one cart, many shops; each shop fulfils its own
+  part of the order independently.
+- **Product variants** — sizes, colours and other options, each with its own
+  price, stock, SKU and image.
+- **Payments** — cash on delivery and card payments (Stripe-ready; simulated
+  in this demo), retry after a failed payment, automatic refund when a paid
+  order is cancelled.
+- **Coupons & promotions** — percent, fixed or free-shipping codes, global or
+  per shop, with usage limits.
+- **Seller earnings** — automatic commission, earnings statement and payouts.
+- **Reviews** — verified-purchase reviews with photos, helpful votes, seller
+  replies and abuse reporting.
+- **Search & filters** — categories, price, rating, product attributes and SKU
+  search.
+- **Wishlist & notifications** — save products, get notified about order
+  updates and when a saved item is back in stock.
+- **Admin tools** — users and roles, catalog structure, coupons, payouts,
+  moderation, store settings.
+- **Light & dark mode**, responsive layout.
+
+## Built with
+
+TypeScript · React 19 · TanStack Start · PostgreSQL · Redis · S3-compatible
+storage · Docker. Deployed on a VPS behind Cloudflare, with automatic deploys
+on every update.
+
+Developer documentation (setup, architecture, deployment):
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
