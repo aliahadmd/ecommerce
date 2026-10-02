@@ -34,7 +34,7 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: getEnv().AUTH_REQUIRE_EMAIL_VERIFICATION,
     minPasswordLength: 8,
     sendResetPassword: async ({ user, url }) => {
       // an SMTP hiccup must not turn into a failed request for the user
@@ -44,7 +44,7 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendOnSignUp: true,
+    sendOnSignUp: getEnv().AUTH_REQUIRE_EMAIL_VERIFICATION,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       // Send the user to the app page after verification (better-auth returns

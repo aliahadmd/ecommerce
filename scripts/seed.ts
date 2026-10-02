@@ -48,7 +48,7 @@ async function main() {
 
   const adminOnly = process.argv.includes("--admin-only");
   if (env.NODE_ENV === "production") {
-    if (!adminOnly) {
+    if (!adminOnly && !env.ALLOW_DEMO_SEED) {
       throw new Error(
         "Refusing to seed demo data in production. Use `pnpm db:seed -- --admin-only` to create the super admin only.",
       );
@@ -72,8 +72,12 @@ async function main() {
     process.exit(0);
   }
 
-  const seller = await ensureUser("Ada Seller", "seller@dev.local", "Seller1234!");
-  const buyer = await ensureUser("Bob Buyer", "buyer@dev.local", "Buyer1234!");
+  // demo hosts set DEMO_USER_PASSWORD so the public demo isn't using the
+  // passwords published in the README
+  const sellerPassword = env.DEMO_USER_PASSWORD || "Seller1234!";
+  const buyerPassword = env.DEMO_USER_PASSWORD || "Buyer1234!";
+  const seller = await ensureUser("Ada Seller", "seller@dev.local", sellerPassword);
+  const buyer = await ensureUser("Bob Buyer", "buyer@dev.local", buyerPassword);
 
   let [shop] = await db
     .select()
@@ -571,9 +575,9 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log(`  super admin : ${env.SUPER_ADMIN_EMAIL} / ${env.SUPER_ADMIN_PASSWORD}`);
-  console.log("  seller      : seller@dev.local / Seller1234!");
-  console.log("  buyer       : buyer@dev.local / Buyer1234!");
+  console.log(`  super admin : ${env.SUPER_ADMIN_EMAIL} / ${env.NODE_ENV === "production" ? "(SUPER_ADMIN_PASSWORD)" : env.SUPER_ADMIN_PASSWORD}`);
+  console.log(`  seller      : seller@dev.local / ${env.NODE_ENV === "production" ? "(DEMO_USER_PASSWORD)" : sellerPassword}`);
+  console.log(`  buyer       : buyer@dev.local / ${env.NODE_ENV === "production" ? "(DEMO_USER_PASSWORD)" : buyerPassword}`);
   process.exit(0);
 }
 

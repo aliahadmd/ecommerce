@@ -1,3 +1,7 @@
+-- Extensions first: the trigram index below needs pg_trgm on a fresh
+-- database (0003 also creates them, for databases migrated before this line).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('super_admin', 'seller', 'buyer');--> statement-breakpoint
 CREATE TYPE "public"."shop_status" AS ENUM('active', 'suspended');--> statement-breakpoint
 CREATE TYPE "public"."product_status" AS ENUM('draft', 'active', 'archived');--> statement-breakpoint

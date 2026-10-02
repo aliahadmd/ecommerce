@@ -33,13 +33,18 @@ function RegisterPage() {
   const form = useForm({
     defaultValues: { name: "", email: "", password: "" },
     onSubmit: async ({ value }) => {
-      const { error } = await authClient.signUp.email({
+      const { data, error } = await authClient.signUp.email({
         name: value.name,
         email: value.email,
         password: value.password,
       })
       if (error) {
         toast.error(error.message ?? "Registration failed")
+        return
+      }
+      // no email verification required (demo hosts): already signed in
+      if (data?.token) {
+        window.location.href = "/"
         return
       }
       setRegistered(value.email)

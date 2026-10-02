@@ -32,3 +32,8 @@ drizzle/meta/_journal.json.bak
 # playwright
 apps/web/test-results/
 apps/web/playwright-report/
+
+# server deploy state (deploy/deploy.sh)
+.deploy.lock
+.deployed-sha
+.deploy-failed-sha

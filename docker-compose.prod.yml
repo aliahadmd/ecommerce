@@ -1,0 +1,184 @@
+# Production / demo-host compose. Everything runs in Docker on the project's
+# private network; the ONLY published port is the proxy on 127.0.0.1:$PROXY_PORT
+# (loopback — Docker-published ports bypass host firewalls). A host cloudflared
+# tunnel routes a public hostname to it. All config comes from the server's
+# generated .env (see deploy/deploy.sh); no host bind mounts.
+name: ecommerce-prod
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?set in .env}
+  REDIS_URL: redis://redis:6379
+  S3_ENDPOINT: http://seaweedfs:8333
+  # browsers load images through the proxy's /storage route (same origin)
+  S3_PUBLIC_URL: /storage/${S3_BUCKET:-products}
+  S3_BUCKET: ${S3_BUCKET:-products}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+  S3_REGION: us-east-1
+  # internal mail sink — demo hosts don't send real email
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  EMAIL_FROM: ${EMAIL_FROM:-Ecommerce Demo <no-reply@example.com>}
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set in .env}
+  BETTER_AUTH_URL: ${PUBLIC_URL:?set in .env}
+  AUTH_REQUIRE_EMAIL_VERIFICATION: ${AUTH_REQUIRE_EMAIL_VERIFICATION:-false}
+  SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?set in .env}
+  SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?set in .env}
+  ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-false}
+  DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+  PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-fake}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  CURRENCY: ${CURRENCY:-USD}
+  SHIPPING_FEE_CENTS: ${SHIPPING_FEE_CENTS:-0}
+
+services:
+  postgres:
+    restart: unless-stopped
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ecommerce
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce -d ecommerce"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    restart: unless-stopped
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  seaweedfs:
+    restart: unless-stopped
+    image: chrislusf/seaweedfs:3.80
+    entrypoint: ["/bin/sh", "-c"]
+    # s3.json generated from env — credentials never live in git. Anonymous
+    # read serves the public product images (writes need the app's key).
+    command:
+      - |
+        cat > /etc/seaweedfs/s3.json <<EJS
+        {
+          "identities": [
+            {
+              "name": "ecommerce",
+              "credentials": [
+                { "accessKey": "$$S3_ACCESS_KEY", "secretKey": "$$S3_SECRET_KEY" }
+              ],
+              "actions": ["Admin", "Read", "Write", "List"]
+            },
+            { "name": "anonymous", "actions": ["Read"] }
+          ]
+        }
+        EJS
+        exec weed server -dir=/data -ip=seaweedfs -master.volumeSizeLimitMB=1024 -volume.max=0 -filer -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+    volumes:
+      - s3data:/data
+    healthcheck:
+      # master up AND the S3 gateway listening
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9333/cluster/status && nc -z localhost 8333"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  mailpit:
+    restart: unless-stopped
+    image: axllent/mailpit:latest
+    environment:
+      MP_MAX_MESSAGES: 500
+
+  # One-shot on every deploy: migrations + idempotent seed (creates the
+  # bucket, super admin and — on demo hosts — demo shop/products/users).
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+
+  web:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  worker:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  proxy:
+    restart: unless-stopped
+    image: caddy:2-alpine
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    ports:
+      # The ONLY published port (loopback). cloudflared → http://localhost:$PROXY_PORT
+      - "127.0.0.1:${PROXY_PORT:?set in .env}:8080"
+    depends_on:
+      web:
+        condition: service_healthy
+
+configs:
+  caddyfile:
+    content: |
+      {
+        admin off
+        auto_https off
+      }
+      :8080 {
+        encode zstd gzip
+        # public product/review images, read-only
+        handle_path /storage/* {
+          @write not method GET HEAD
+          respond @write 405
+          reverse_proxy seaweedfs:8333
+        }
+        handle {
+          reverse_proxy web:3000
+        }
+      }
+
+volumes:
+  pgdata:
+  redisdata:
+  s3data:

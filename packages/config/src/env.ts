@@ -38,9 +38,22 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().default("dev-secret-change-me-0123456789abcdef0123456789abcdef"),
   BETTER_AUTH_URL: z.string().default("http://localhost:3000"),
 
+  /** "false" on demo hosts: sign-up signs in immediately (no inbox needed) */
+  AUTH_REQUIRE_EMAIL_VERIFICATION: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+
   // Seed
   SUPER_ADMIN_EMAIL: z.string().default("admin@dev.local"),
   SUPER_ADMIN_PASSWORD: z.string().default("Admin1234!"),
+  /** demo hosts: allow the demo-data seed even when NODE_ENV=production */
+  ALLOW_DEMO_SEED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  /** password for the seeded demo seller/buyer (empty = the dev defaults) */
+  DEMO_USER_PASSWORD: z.string().default(""),
 
   // AI (OpenRouter) — empty key disables AI features gracefully
   OPENROUTER_API_KEY: z.string().default(""),

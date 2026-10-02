@@ -10,8 +10,8 @@ services:
       POSTGRES_DB: ecommerce
     ports:
       - "5432:5432"
-    # No init scripts: migration 0003_enable_extensions creates pg_trgm and
-    # vector, so a fresh or external database converges the same way.
+    # No init scripts: the first migration (0000) creates pg_trgm and vector,
+    # so a fresh or external database converges the same way.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

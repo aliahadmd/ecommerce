@@ -31,8 +31,9 @@ Demo accounts (created by the seed — **development only**):
 | buyer       | `buyer@dev.local`  | `Buyer1234!`  |
 
 The dev compose file uses no host bind mounts (the only config, SeaweedFS's
-S3 keys, is inline), so it also works when the repo lives on a drive Docker
-Desktop can't share — e.g. an external disk that holds Docker's own data.
+S3 keys, is inline; Postgres extensions come from the first migration), so it
+also works when the repo lives on a drive Docker Desktop can't share — e.g. an
+external disk that holds Docker's own data.
 
 ## Services (dev)
 
@@ -62,25 +63,41 @@ money, order state machine, order split/status rules, CSV), and the Playwright
 suite (`cd apps/web && npx playwright test`, needs `make up`, `make seed`,
 `make dev` and `make worker`).
 
-## Deploying (Dokploy)
+## Deploying (single demo server + Cloudflare Tunnel)
 
-Two stateless containers built from this repo; every dependency is an external
-service referenced only via env vars (contract: `.env.example`).
+Same pattern as the other projects on the server: everything runs in Docker
+(`docker-compose.prod.yml`, Compose project `ecommerce-prod`); the **only
+published port is the Caddy proxy on `127.0.0.1:$PROXY_PORT`** (loopback —
+never `0.0.0.0`; Docker bypasses host firewalls). Caddy routes `/storage/*`
+(read-only) to SeaweedFS for product images and everything else to the web
+app. postgres, redis, seaweedfs, mailpit (internal mail sink), web and worker
+stay on the project's private network. A host `cloudflared` tunnel routes a
+public hostname to the port.
 
-| Concern         | Approach                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| App             | **`Dockerfile`**; healthcheck `/api/health`; domain via Dokploy proxy                             |
-| Worker          | **`Dockerfile.worker`** — required for order emails/notifications; same env as the app; heartbeat healthcheck |
-| Postgres        | Dokploy Postgres template **or** external (Postgres 17 + pgvector) — `DATABASE_URL`             |
-| Redis           | Dokploy Redis template or external — `REDIS_URL`                                                |
-| Object storage  | External S3 / SeaweedFS / Minio — `S3_*`                                                         |
-| SMTP            | External provider — `SMTP_*` (Mailpit is dev-only)                                               |
-| Payments        | `PAYMENT_PROVIDER=stripe` + `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; point the Stripe webhook at `/api/payments/callback`. The fake gateway is dev-only. |
-| Migrations      | One-off `pnpm db:migrate` before each deploy                                                     |
-| First admin     | One-off `pnpm db:seed -- --admin-only` with `SUPER_ADMIN_EMAIL` + a strong `SUPER_ADMIN_PASSWORD` (the demo seed refuses to run in production) |
+```bash
+# one-time on the server
+git clone https://github.com/aliahadmd/ecommerce.git /opt/apps/ecommerce
+echo "30002 ecommerce" >> /opt/apps/PORTS          # next free loopback port
+/opt/apps/ecommerce/deploy/deploy.sh               # generates .env, builds, migrates, seeds, starts
+( crontab -l; echo '* * * * * /opt/apps/ecommerce/deploy/deploy.sh >> /var/log/ecommerce-deploy.log 2>&1' ) | crontab -
+# Cloudflare dashboard → tunnel → public hostname → http://localhost:30002
+# then set PUBLIC_URL=https://<hostname> in /opt/apps/ecommerce/.env and run deploy.sh --force
+```
 
-In production the app refuses to boot with missing or dev-default secrets.
-`docker-compose.prod.example.yml` shows the same wiring in compose form.
+**Continuous deployment is pull-based:** cron runs `deploy/deploy.sh` every
+minute; it redeploys only when `origin/main` moved (`git reset --hard` +
+`docker compose up -d --build`, which runs the one-shot `migrate` service —
+migrations + idempotent seed — before web/worker start). A failing commit is
+skipped until a new push (or `--force`). No SSH keys in GitHub, no inbound
+access. Server secrets live in the generated, git-ignored `.env` (`chmod 600`);
+deploys never rewrite it.
+
+Demo-host settings (in that `.env`): demo data is seeded
+(`ALLOW_DEMO_SEED=true`), sign-up needs no email verification, card payments
+use the built-in fake gateway, and the super admin / demo user passwords are
+random — read them with `grep -E 'SUPER_ADMIN|DEMO_USER' /opt/apps/ecommerce/.env`.
+For a real deployment set `ALLOW_DEMO_SEED=false`,
+`AUTH_REQUIRE_EMAIL_VERIFICATION=true`, real SMTP and Stripe keys.
 
 ## Plans
 

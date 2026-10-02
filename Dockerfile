@@ -16,21 +16,25 @@ COPY packages/auth/package.json packages/auth/
 COPY packages/ai/package.json packages/ai/
 RUN pnpm fetch
 
+# Full install + build. Also the image of the one-shot `migrate` service in
+# docker-compose.prod.yml (migrations + seed need devDependencies like tsx).
 FROM deps AS build
 COPY . .
 RUN pnpm install --frozen-lockfile --offline && pnpm build
+
 # Drop devDependencies; keep production deps + workspace links for runtime
+FROM build AS prod-deps
 RUN pnpm install --prod --frozen-lockfile --offline
 
 FROM node:22-alpine AS runtime
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
-COPY --from=build --chown=app:app /repo/package.json ./package.json
-COPY --from=build --chown=app:app /repo/node_modules ./node_modules
-COPY --from=build --chown=app:app /repo/packages ./packages
-COPY --from=build --chown=app:app /repo/apps/web/dist ./apps/web/dist
-COPY --from=build --chown=app:app /repo/apps/web/node_modules ./apps/web/node_modules
-COPY --from=build --chown=app:app /repo/apps/web/server.production.mjs ./apps/web/server.production.mjs
+COPY --from=prod-deps --chown=app:app /repo/package.json ./package.json
+COPY --from=prod-deps --chown=app:app /repo/node_modules ./node_modules
+COPY --from=prod-deps --chown=app:app /repo/packages ./packages
+COPY --from=prod-deps --chown=app:app /repo/apps/web/dist ./apps/web/dist
+COPY --from=prod-deps --chown=app:app /repo/apps/web/node_modules ./apps/web/node_modules
+COPY --from=prod-deps --chown=app:app /repo/apps/web/server.production.mjs ./apps/web/server.production.mjs
 USER app
 EXPOSE 3000
 ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0
