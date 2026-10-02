@@ -3,8 +3,58 @@
  * (dist/server/server.js). Handles streaming responses and multiple
  * Set-Cookie headers. Node >= 20.
  */
+import { createReadStream } from "node:fs"
+import { stat } from "node:fs/promises"
 import { createServer } from "node:http"
+import { extname, join, normalize, sep } from "node:path"
+import { fileURLToPath } from "node:url"
 import handler from "./dist/server/server.js"
+
+// The Start fetch handler renders pages and server functions only; the built
+// client files (JS/CSS/fonts/public/) are served from dist/client here.
+const CLIENT_DIR = fileURLToPath(new URL("./dist/client/", import.meta.url))
+const MIME = {
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".woff2": "font/woff2",
+  ".json": "application/json",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".webp": "image/webp",
+}
+
+/** Serve a file from dist/client if the path names one; false otherwise. */
+async function serveStatic(req, res, pathname) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false
+  let decoded
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    return false
+  }
+  const file = normalize(join(CLIENT_DIR, decoded))
+  if (!file.startsWith(CLIENT_DIR) || file.endsWith(sep)) return false // no traversal
+  let info
+  try {
+    info = await stat(file)
+  } catch {
+    return false
+  }
+  if (!info.isFile()) return false
+  res.writeHead(200, {
+    "content-type": MIME[extname(file)] ?? "application/octet-stream",
+    "content-length": info.size,
+    // hashed build assets never change; public/ files may
+    "cache-control": decoded.startsWith("/assets/")
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=3600",
+  })
+  if (req.method === "HEAD") res.end()
+  else createReadStream(file).pipe(res)
+  return true
+}
 
 const port = Number(process.env.PORT) || 3000
 const hostname = process.env.HOST || "0.0.0.0"
@@ -40,6 +90,7 @@ const server = createServer(async (req, res) => {
       req.url ?? "/",
       `http://${req.headers.host ?? "localhost"}`
     )
+    if (await serveStatic(req, res, url.pathname)) return
     const body =
       req.method !== "GET" && req.method !== "HEAD"
         ? await readBody(req)
