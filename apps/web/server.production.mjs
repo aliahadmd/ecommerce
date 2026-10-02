@@ -91,6 +91,13 @@ const server = createServer(async (req, res) => {
       `http://${req.headers.host ?? "localhost"}`
     )
     if (await serveStatic(req, res, url.pathname)) return
+    // A missing hashed asset (e.g. from a previous build) must not be cached
+    // as a 404 by browsers or the CDN — the next deploy may need that URL.
+    if (url.pathname.startsWith("/assets/")) {
+      res.writeHead(404, { "cache-control": "no-store", "content-type": "text/plain" })
+      res.end("Not Found")
+      return
+    }
     const body =
       req.method !== "GET" && req.method !== "HEAD"
         ? await readBody(req)
