@@ -15,6 +15,7 @@ import {
   placeOrder,
 } from "@/server/commerce"
 import { startCheckoutPayment } from "@/server/payments"
+import { getAppliedCoupon } from "@/server/coupons"
 import { unwrap } from "@/lib/unwrap"
 import { setCartCount } from "@/lib/cart-store"
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,11 @@ function CheckoutPage() {
   const { data: cart } = useQuery({
     queryKey: ["cart"],
     queryFn: () => getCart().then(unwrap),
+  })
+  // the cart's coupon (checkout charges it — the summary must show it)
+  const { data: coupon } = useQuery({
+    queryKey: ["coupon"],
+    queryFn: () => getAppliedCoupon().then((r) => (r.ok ? r.data : null)),
   })
   const { data: addresses } = useQuery({
     queryKey: ["addresses"],
@@ -261,10 +267,23 @@ function CheckoutPage() {
                 <span>{formatMoney(i.priceCents * i.quantity, currency)}</span>
               </div>
             ))}
+            {coupon && coupon.discountCents > 0 && (
+              <div className="flex justify-between gap-2 text-green-700 dark:text-green-500">
+                <span>Coupon {coupon.code}</span>
+                <span>−{formatMoney(coupon.discountCents, currency)}</span>
+              </div>
+            )}
             <div className="border-t pt-2 font-semibold">
               <div className="flex justify-between">
-                <span>Total — cash on delivery</span>
-                <span>{formatMoney(cart.subtotalCents, currency)}</span>
+                <span>
+                  Total — {method === "card" ? "pay by card" : "cash on delivery"}
+                </span>
+                <span>
+                  {formatMoney(
+                    cart.subtotalCents - (coupon?.discountCents ?? 0),
+                    currency,
+                  )}
+                </span>
               </div>
             </div>
             <div className="flex gap-2">

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/chart"
 import type { ChartConfig } from "@/components/ui/chart"
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { fillDays } from "@/lib/chart-days"
 import { Package, Clock, HandCoins, DollarSign } from "lucide-react"
 
 export const Route = createFileRoute("/seller/")({
@@ -54,10 +55,7 @@ function SellerDashboard() {
     queryFn: () => getSellerStats().then(unwrap),
   })
 
-  const chartData = (stats?.ordersPerDay ?? []).map((d) => ({
-    day: d.day.slice(5),
-    orders: d.count,
-  }))
+  const chartData = fillDays(stats?.ordersPerDay ?? [])
 
   return (
     <div className="space-y-6">
